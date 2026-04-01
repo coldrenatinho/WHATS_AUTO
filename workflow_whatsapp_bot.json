@@ -1,0 +1,347 @@
+{
+  "name": "WhatsApp Bot Comercial com IA",
+  "nodes": [
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "11111111-1111-1111-1111-111111111101",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "whatsapp-bot-webhook-001"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// NODE 2: Parse Mensagem\n// Extrai dados da mensagem recebida pela Evolution API\n// Filtra mensagens enviadas pelo bot (fromMe)\n// ═══════════════════════════════════════════════════\n\nconst body = $input.first().json;\n\n// Suporta Evolution API v1 e v2\nconst data = body.data || body;\nconst key = data.key || {};\n\n// Ignora mensagens enviadas pelo próprio bot\nconst fromMe = key.fromMe || data.fromMe || false;\nif (fromMe) return [];\n\n// Ignora mensagens de grupos\nconst remoteJid = key.remoteJid || data.remoteJid || '';\nif (remoteJid.includes('@g.us')) return [];\nif (!remoteJid) return [];\n\n// Extrai número do telefone (somente dígitos)\nconst phone = remoteJid.replace('@s.whatsapp.net', '').replace(/\\D/g, '');\nif (!phone || phone.length < 8) return [];\n\n// Extrai texto da mensagem (vários formatos)\nconst msg = data.message || {};\nconst text = (\n  msg.conversation ||\n  msg.extendedTextMessage?.text ||\n  msg.imageMessage?.caption ||\n  msg.videoMessage?.caption ||\n  msg.documentMessage?.caption ||\n  data.body ||\n  ''\n).trim();\n\nif (!text) return [];\n\n// Nome e instância\nconst pushName = data.pushName || data.pushname || 'Cliente';\nconst instanceName = body.instance || body.instanceName || $env.EVOLUTION_INSTANCE || '';\n\nreturn [{\n  json: {\n    phone,\n    name: pushName,\n    message: text,\n    remoteJid,\n    instanceName,\n    timestamp: Date.now()\n  }\n}];"
+      },
+      "id": "11111111-1111-1111-1111-111111111102",
+      "name": "Parse Mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// NODE 3: DB - Cliente e Histórico\n// Inicializa banco SQLite\n// Busca ou cria registro do cliente\n// Carrega histórico das últimas mensagens\n// ═══════════════════════════════════════════════════\n\nconst Database = require('better-sqlite3');\nconst db = new Database('/data/bot.db');\n\n// Cria tabelas se não existirem\ndb.exec(`\n  CREATE TABLE IF NOT EXISTS clients (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    phone TEXT UNIQUE NOT NULL,\n    name TEXT,\n    service_interest TEXT,\n    preferred_time TEXT,\n    tag TEXT DEFAULT 'lead_frio',\n    interaction_count INTEGER DEFAULT 0,\n    transferred INTEGER DEFAULT 0,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n  );\n\n  CREATE TABLE IF NOT EXISTS conversations (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    phone TEXT NOT NULL,\n    role TEXT NOT NULL,\n    content TEXT NOT NULL,\n    intent TEXT,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n  );\n`);\n\nconst { phone, name } = $input.first().json;\n\n// Busca cliente existente\nlet client = db.prepare('SELECT * FROM clients WHERE phone = ?').get(phone);\n\n// Cria cliente novo se não existir\nif (!client) {\n  db.prepare('INSERT OR IGNORE INTO clients (phone, name) VALUES (?, ?)').run(phone, name);\n  client = db.prepare('SELECT * FROM clients WHERE phone = ?').get(phone);\n}\n\n// Histórico das últimas 8 mensagens (4 trocas)\nconst history = db.prepare(\n  'SELECT role, content FROM conversations WHERE phone = ? ORDER BY created_at DESC LIMIT 8'\n).all(phone).reverse();\n\ndb.close();\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    client,\n    history,\n    isNew: client.interaction_count === 0\n  }\n}];"
+      },
+      "id": "11111111-1111-1111-1111-111111111103",
+      "name": "DB: Cliente e Histórico",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// NODE 4: Montar Payload IA\n// Monta o array de mensagens para o Gemini\n// Injeta contexto do cliente no system prompt\n// ═══════════════════════════════════════════════════\n\nconst { phone, name, message, client, history } = $input.first().json;\n\nconst businessName = $env.BUSINESS_NAME || 'Nossa Empresa';\n\nconst systemPrompt = `Você é Ana, assistente virtual comercial da ${businessName}.\nSeja amigável, profissional e concisa. Responda SEMPRE em português brasileiro.\n\nDADOS DO CLIENTE:\n- Nome: ${client?.name || name || 'Não informado'}\n- Interesse: ${client?.service_interest || 'Ainda não coletado'}\n- Status: ${client?.tag || 'lead_frio'}\n- Total de interações: ${client?.interaction_count || 0}\n\nSERVIÇOS OFERECIDOS:\n- Compra e venda de veículos premium\n- Avaliação de veículos usados\n- Financiamento com as melhores taxas\n- Blindagem veicular\n- Revisão e manutenção especializada\n\nINSTRUÇÕES:\n1. Responda de forma natural e profissional\n2. Use no máximo 3 frases curtas e diretas\n3. Não use emojis em excesso (máximo 1)\n4. Se não souber o nome, pergunte naturalmente\n5. Se for orçamento, descubra o serviço específico\n6. Se for agendamento, pergunte data e horário preferido\n7. Se o cliente pedir humano ou reclamar → intent: humano\n\nCLASSIFICAÇÃO DE LEADS:\n- lead_frio: curiosidade, sem interesse real imediato\n- lead_morno: demonstrou interesse, está pesquisando\n- lead_quente: quer comprar/contratar, tem urgência\n\nRETORNE APENAS JSON VÁLIDO (sem markdown):\n{\n  \"intent\": \"duvida | orcamento | agendamento | humano\",\n  \"reply\": \"texto da resposta ao cliente\",\n  \"tag\": \"lead_frio | lead_morno | lead_quente\",\n  \"extract\": {\n    \"name\": \"nome mencionado ou null\",\n    \"service\": \"serviço de interesse ou null\",\n    \"datetime\": \"data/hora preferida ou null\"\n  }\n}`;\n\nconst messages = [\n  { role: 'system', content: systemPrompt },\n  ...history.map(h => ({ role: h.role, content: h.content })),\n  { role: 'user', content: message }\n];\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    openaiPayload: {\n      model: 'gemini-2.0-flash',\n      messages,\n      temperature: 0.7,\n      max_tokens: 600,\n      response_format: { type: 'json_object' }\n    }\n  }\n}];"
+      },
+      "id": "11111111-1111-1111-1111-111111111104",
+      "name": "Montar Payload IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.GEMINI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openaiPayload) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "11111111-1111-1111-1111-111111111105",
+      "name": "Gemini: Classificar e Responder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "onError": "continueErrorOutput"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// NODE 6: Processar Resposta IA + Salvar no DB\n// Parse do JSON retornado pelo OpenAI\n// Salva conversa e atualiza dados do cliente\n// Monta resposta final com formatação\n// ═══════════════════════════════════════════════════\n\nconst Database = require('better-sqlite3');\n\n// Pega contexto do node anterior ao OpenAI\nconst ctx = $('Montar Payload IA').first().json;\nconst aiRaw = $input.first().json;\n\nconst { phone, name, message, client } = ctx;\n\n// Parse da resposta do OpenAI\nlet aiData;\ntry {\n  const content = aiRaw.choices[0].message.content;\n  aiData = JSON.parse(content);\n  const validIntents = ['duvida', 'orcamento', 'agendamento', 'humano'];\n  if (!validIntents.includes(aiData.intent)) aiData.intent = 'duvida';\n  if (!['lead_frio', 'lead_morno', 'lead_quente'].includes(aiData.tag)) {\n    aiData.tag = client?.tag || 'lead_frio';\n  }\n} catch (e) {\n  // Fallback se parse falhar\n  aiData = {\n    intent: 'humano',\n    reply: 'Vou te encaminhar para um de nossos atendentes. Um momento! 😊',\n    tag: client?.tag || 'lead_frio',\n    extract: {}\n  };\n}\n\n// Monta resposta final (adiciona aviso de transferência se necessário)\nlet finalReply = aiData.reply || 'Estou aqui para ajudar! 😊';\nif (aiData.intent === 'humano') {\n  finalReply = `${finalReply}\\n\\n⏳ Você será atendido em breve.`;\n}\n\n// Salva no banco de dados\nconst db = new Database('/data/bot.db');\n\n// Salva mensagem do usuário\ndb.prepare(\n  'INSERT INTO conversations (phone, role, content, intent) VALUES (?, \\'user\\', ?, ?)'\n).run(phone, message, aiData.intent);\n\n// Salva resposta do bot\ndb.prepare(\n  'INSERT INTO conversations (phone, role, content, intent) VALUES (?, \\'assistant\\', ?, ?)'\n).run(phone, finalReply, aiData.intent);\n\n// Atualiza dados do cliente\nconst extract = aiData.extract || {};\ndb.prepare(`\n  UPDATE clients SET\n    name = COALESCE(?, name),\n    service_interest = COALESCE(?, service_interest),\n    preferred_time = COALESCE(?, preferred_time),\n    tag = ?,\n    interaction_count = interaction_count + 1,\n    transferred = CASE WHEN ? = 1 THEN 1 ELSE transferred END,\n    updated_at = CURRENT_TIMESTAMP\n  WHERE phone = ?\n`).run(\n  extract.name || null,\n  extract.service || null,\n  extract.datetime || null,\n  aiData.tag,\n  aiData.intent === 'humano' ? 1 : 0,\n  phone\n);\n\ndb.close();\n\n// Monta notificação para atendente humano\nconst humanMsg = aiData.intent === 'humano'\n  ? `🔔 *ATENDIMENTO SOLICITADO*\\n\\n` +\n    `*Cliente:* ${extract.name || client?.name || name}\\n` +\n    `*Telefone:* ${phone}\\n` +\n    `*Interesse:* ${extract.service || client?.service_interest || 'Não informado'}\\n` +\n    `*Última mensagem:* \"${message}\"\\n` +\n    `*Tag:* ${aiData.tag}`\n  : null;\n\nreturn [{\n  json: {\n    phone,\n    remoteJid: ctx.remoteJid,\n    instanceName: ctx.instanceName,\n    reply: finalReply,\n    intent: aiData.intent,\n    tag: aiData.tag,\n    sendToHuman: aiData.intent === 'humano',\n    humanPhone: $env.HUMAN_PHONE || '',\n    humanMsg\n  }\n}];"
+      },
+      "id": "11111111-1111-1111-1111-111111111106",
+      "name": "Processar IA e Salvar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// NODE FALLBACK: Erro na IA\n// Acionado quando o OpenAI retorna erro\n// Monta resposta padrão de fallback\n// ═══════════════════════════════════════════════════\n\nconst ctx = $('Montar Payload IA').first().json;\n\nreturn [{\n  json: {\n    phone: ctx.phone,\n    remoteJid: ctx.remoteJid,\n    instanceName: ctx.instanceName,\n    reply: 'Desculpe, tive um problema técnico. Vou te conectar com um atendente. 😊',\n    intent: 'humano',\n    tag: ctx.client?.tag || 'lead_frio',\n    sendToHuman: false,\n    humanMsg: null\n  }\n}];"
+      },
+      "id": "11111111-1111-1111-1111-111111111107",
+      "name": "Fallback: Erro IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 500]
+    },
+
+    {
+      "parameters": {
+        "unit": "seconds",
+        "amount": "={{ Math.floor(Math.random() * 3) + 2 }}"
+      },
+      "id": "11111111-1111-1111-1111-111111111108",
+      "name": "Delay Humanizado",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    },
+
+    {
+      "parameters": {
+        "unit": "seconds",
+        "amount": 1
+      },
+      "id": "11111111-1111-1111-1111-111111111109",
+      "name": "Delay Fallback",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1560, 500]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_SERVER_URL }}/message/sendText/{{ $json.instanceName || $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.phone, text: $json.reply }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "11111111-1111-1111-1111-111111111110",
+      "name": "Evolution: Enviar Resposta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_SERVER_URL }}/message/sendText/{{ $json.instanceName || $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.phone, text: $json.reply }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Evolution: Enviar Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 500]
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-human-001",
+              "leftValue": "={{ $json.sendToHuman }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "11111111-1111-1111-1111-111111111112",
+      "name": "IF: Notificar Humano?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_SERVER_URL }}/message/sendText/{{ $json.instanceName || $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.humanPhone, text: $json.humanMsg }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "11111111-1111-1111-1111-111111111113",
+      "name": "Evolution: Notificar Atendente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 200]
+    },
+
+    {
+      "parameters": {
+        "content": "## WhatsApp Bot Comercial com IA\n\n**Fluxo principal:**\n1. Recebe mensagem via Evolution API webhook\n2. Extrai e valida dados (ignora grupos e mensagens do bot)\n3. Busca/cria cliente no SQLite + carrega histórico\n4. Monta contexto com dados do cliente para o Gemini 2.0 Flash\n5. IA classifica intenção e gera resposta em JSON\n6. Salva conversa e atualiza tag do cliente\n7. Delay 2-4s (simula digitação humana)\n8. Envia resposta via Evolution API\n9. Se intent=humano → notifica atendente\n\n**Intents:** duvida | orcamento | agendamento | humano\n\n**Tags de lead:** lead_frio | lead_morno | lead_quente\n\n**Banco de dados:** SQLite em /data/bot.db\n- Tabela clients: dados do cliente + tag\n- Tabela conversations: histórico de mensagens\n\n**Config:** Variáveis de ambiente no docker-compose.yml",
+        "height": 420,
+        "width": 380
+      },
+      "id": "11111111-1111-1111-1111-111111111114",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, -120]
+    }
+
+  ],
+
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [{"node": "Parse Mensagem", "type": "main", "index": 0}]
+      ]
+    },
+    "Parse Mensagem": {
+      "main": [
+        [{"node": "DB: Cliente e Histórico", "type": "main", "index": 0}]
+      ]
+    },
+    "DB: Cliente e Histórico": {
+      "main": [
+        [{"node": "Montar Payload IA", "type": "main", "index": 0}]
+      ]
+    },
+    "Montar Payload IA": {
+      "main": [
+        [{"node": "Gemini: Classificar e Responder", "type": "main", "index": 0}]
+      ]
+    },
+    "Gemini: Classificar e Responder": {
+      "main": [
+        [{"node": "Processar IA e Salvar", "type": "main", "index": 0}],
+        [{"node": "Fallback: Erro IA", "type": "main", "index": 0}]
+      ]
+    },
+    "Processar IA e Salvar": {
+      "main": [
+        [{"node": "Delay Humanizado", "type": "main", "index": 0}]
+      ]
+    },
+    "Fallback: Erro IA": {
+      "main": [
+        [{"node": "Delay Fallback", "type": "main", "index": 0}]
+      ]
+    },
+    "Delay Humanizado": {
+      "main": [
+        [{"node": "Evolution: Enviar Resposta", "type": "main", "index": 0}]
+      ]
+    },
+    "Delay Fallback": {
+      "main": [
+        [{"node": "Evolution: Enviar Fallback", "type": "main", "index": 0}]
+      ]
+    },
+    "Evolution: Enviar Resposta": {
+      "main": [
+        [{"node": "IF: Notificar Humano?", "type": "main", "index": 0}]
+      ]
+    },
+    "IF: Notificar Humano?": {
+      "main": [
+        [{"node": "Evolution: Notificar Atendente", "type": "main", "index": 0}],
+        []
+      ]
+    }
+  },
+
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "id": "whatsapp-bot-comercial-001",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "local-instance"
+  },
+  "pinData": {},
+  "tags": [
+    {"name": "whatsapp"},
+    {"name": "bot"},
+    {"name": "ia"}
+  ]
+}

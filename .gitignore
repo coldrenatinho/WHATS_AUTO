@@ -1,0 +1,16 @@
+# Variáveis de ambiente (contém chaves secretas — NUNCA subir)
+.env
+
+# Dados do bot (banco SQLite local)
+bot_data/
+
+# Logs
+*.log
+logs/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
