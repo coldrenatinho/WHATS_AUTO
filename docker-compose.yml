@@ -1,5 +1,59 @@
 services:
-  # ─── n8n ────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════
+  # NORTE MT SISTEMAS - WhatsApp Chatbot Multi-Tenant
+  # Repositório: https://nortemtsistemas.com.br/
+  # ═══════════════════════════════════════════════════════════════
+
+  # ─── Backend API (Node.js + Express) ─────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: whatsauto_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-whatsauto}
+      - DB_USER=${DB_USER:-whatsauto}
+      - DB_PASS=${DB_PASS:-whatsauto123}
+      - JWT_SECRET=${JWT_SECRET:-sua_chave_jwt_super_secreta}
+      - EVOLUTION_SERVER_URL=http://evolution:8080
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - N8N_WEBHOOK_URL=http://n8n:5678
+    networks:
+      - bot_network
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ─── Frontend (Vue.js + Tailwind CSS) ───────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: whatsauto_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=${API_URL:-https://api.nortemtsistemas.com.br}
+    networks:
+      - bot_network
+    depends_on:
+      - backend
+
+  # ─── n8n (Automação) ────────────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
     container_name: n8n_bot
@@ -10,27 +64,28 @@ services:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
-      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_HOST=${N8N_HOST:-n8n.nortemtsistemas.com.br}
       - N8N_PORT=5678
-      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-      - WEBHOOK_URL=${WEBHOOK_URL}
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=${WEBHOOK_URL:-https://n8n.nortemtsistemas.com.br}
       - NODE_ENV=production
       - GENERIC_TIMEZONE=America/Sao_Paulo
       - TZ=America/Sao_Paulo
-      # Permite usar better-sqlite3 nos Code nodes
       - NODE_FUNCTION_ALLOW_EXTERNAL=better-sqlite3
-      # Variáveis do bot (acessíveis via $env.NOME no n8n)
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - EVOLUTION_SERVER_URL=${EVOLUTION_SERVER_URL}
+      - EVOLUTION_SERVER_URL=http://evolution:8080
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE}
       - HUMAN_PHONE=${HUMAN_PHONE}
       - BUSINESS_NAME=${BUSINESS_NAME}
+      - BACKEND_URL=http://backend:3000
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./bot_data:/data        # SQLite do bot fica aqui
+      - ./bot_data:/data
     networks:
       - bot_network
+    depends_on:
+      - backend
 
   # ─── Evolution API (WhatsApp) ────────────────────────────────────
   evolution:
@@ -40,7 +95,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SERVER_URL=${EVOLUTION_SERVER_URL:-http://localhost:8080}
+      - SERVER_URL=${EVOLUTION_SERVER_URL:-https://evolution.nortemtsistemas.com.br}
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -49,11 +104,9 @@ services:
       - LOG_COLOR=true
       - DEL_INSTANCE=false
       - QRCODE_LIMIT=30
-      # Eventos que disparam webhook para o n8n
       - WEBHOOK_EVENTS_MESSAGES_UPSERT=true
       - WEBHOOK_EVENTS_CONNECTION_UPDATE=true
       - WEBHOOK_EVENTS_QRCODE_UPDATED=true
-      # Todos os outros eventos desligados
       - WEBHOOK_EVENTS_MESSAGES_SET=false
       - WEBHOOK_EVENTS_MESSAGES_UPDATE=false
       - WEBHOOK_EVENTS_SEND_MESSAGE=false
@@ -67,6 +120,30 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # ─── MariaDB (Banco Principal) ──────────────────────────────────
+  mariadb:
+    image: mariadb:11.4-latest
+    container_name: whatsauto_mariadb
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASS:-root_super_secret}
+      - MYSQL_DATABASE=${DB_NAME:-whatsauto}
+      - MYSQL_USER=${DB_USER:-whatsauto}
+      - MYSQL_PASSWORD=${DB_PASS:-whatsauto123}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./infrastructure/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD", "mariadb", "-u${DB_USER:-whatsauto}", "-p${DB_PASS:-whatsauto123}", "-e", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   # ─── PostgreSQL (para Evolution API) ────────────────────────────
   postgres:
@@ -87,10 +164,29 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── Redis (Cache opcional) ─────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: whatsauto_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   n8n_data:
   evolution_data:
   postgres_data:
+  mariadb_data:
+  redis_data:
 
 networks:
   bot_network:
