@@ -23,7 +23,7 @@ if [ ! -f .env ]; then
   echo "▶ Criando .env a partir do exemplo..."
   cp .env.example .env
   echo "⚠️  EDITE o arquivo .env com suas chaves antes de continuar!"
-  echo "   Especialmente: OPENAI_API_KEY, EVOLUTION_API_KEY, N8N_PASSWORD"
+  echo "   Especialmente: GEMINI_API_KEY, EVOLUTION_API_KEY, N8N_PASSWORD, ADMIN_EMAIL e ADMIN_PASSWORD"
   echo ""
   read -p "   Pressione ENTER após editar o .env..." _
 fi

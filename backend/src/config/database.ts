@@ -1,5 +1,6 @@
 import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
+import logger from '../utils';
 
 dotenv.config();
 
@@ -10,7 +11,11 @@ const sequelize = new Sequelize(
   {
     host: process.env.DB_HOST || 'localhost',
     dialect: 'mariadb',
-    logging: false,
+    logging: logger.isSqlLoggingEnabled()
+      ? (sql, timing) => {
+          logger.debug('SQL', { sql, timing });
+        }
+      : false,
     dialectOptions: {
       connectTimeout: 60000,
     },

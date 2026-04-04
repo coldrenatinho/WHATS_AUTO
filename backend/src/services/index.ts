@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { User, Company, sequelize } from '../models';
-import { AuthRequest } from '../middlewares';
+import logger from '../utils';
 
 // ═══════════════════════════════════════════════════════════════
 // Auth Service
@@ -22,26 +22,31 @@ interface RegisterData {
 
 class AuthService {
   async login(data: LoginData) {
+    logger.debug('Tentativa de login recebida', { email: data.email });
     const user = await User.findOne({
       where: { email: data.email },
       include: [{ model: Company, as: 'company' }],
     });
 
     if (!user) {
+      logger.warn('Login rejeitado: usuario nao encontrado', { email: data.email });
       throw new Error('Credenciais inválidas');
     }
 
     if (!user.is_active) {
+      logger.warn('Login rejeitado: usuario inativo', { userId: user.id, companyId: user.company_id });
       throw new Error('Usuário inativo');
     }
 
     const isValidPassword = await user.validatePassword(data.password);
     if (!isValidPassword) {
+      logger.warn('Login rejeitado: senha invalida', { userId: user.id, companyId: user.company_id });
       throw new Error('Credenciais inválidas');
     }
 
     // Atualiza último login
     await user.update({ last_login_at: new Date() });
+    logger.info('Ultimo login atualizado', { userId: user.id, companyId: user.company_id });
 
     const token = this.generateToken(user);
 
@@ -59,6 +64,11 @@ class AuthService {
   }
 
   async register(data: RegisterData) {
+    logger.debug('Tentativa de cadastro recebida', {
+      email: data.email,
+      companyName: data.companyName,
+      subdomain: data.subdomain,
+    });
     const transaction = await sequelize.transaction();
 
     try {
@@ -69,6 +79,7 @@ class AuthService {
       });
 
       if (existingCompany) {
+        logger.warn('Cadastro rejeitado: subdominio em uso', { subdomain: data.subdomain });
         throw new Error('Subdomínio já está em uso');
       }
 
@@ -79,6 +90,7 @@ class AuthService {
       });
 
       if (existingUser) {
+        logger.warn('Cadastro rejeitado: email em uso', { email: data.email });
         throw new Error('Email já está cadastrado');
       }
 
@@ -109,6 +121,11 @@ class AuthService {
       );
 
       await transaction.commit();
+      logger.info('Novo cadastro persistido', {
+        companyId: company.id,
+        userId: user.id,
+        subdomain: company.subdomain,
+      });
 
       const token = this.generateToken(user);
 
@@ -124,12 +141,18 @@ class AuthService {
       };
     } catch (error) {
       await transaction.rollback();
+      logger.error('Falha ao persistir cadastro', error);
       throw error;
     }
   }
 
   private generateToken(user: User): string {
-    const secret = process.env.JWT_SECRET || 'default_secret';
+    const secret = process.env.JWT_SECRET;
+
+    if (!secret) {
+      throw new Error('JWT_SECRET nao configurado');
+    }
+
     return jwt.sign(
       { userId: user.id, companyId: user.company_id },
       secret,

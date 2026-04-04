@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -10,109 +10,142 @@ const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
 const error = ref('')
+const showPassword = ref(false)
+
+const canSubmit = computed(() => {
+  return email.value.trim().length > 0 && password.value.trim().length > 0 && !isLoading.value
+})
 
 const handleLogin = async () => {
+  if (!canSubmit.value) return
+
   isLoading.value = true
   error.value = ''
 
   const result = await authStore.login(email.value, password.value)
-  
+
   if (result.success) {
     router.push('/')
   } else {
     error.value = result.error || 'Erro ao fazer login'
   }
-  
+
   isLoading.value = false
 }
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-      <!-- Logo -->
-      <div class="text-center">
-        <div class="mx-auto w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mb-4">
-          <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.405 0 .027 5.378.027 12.024a11.9 11.9 0 001.587 5.947L0 24l6.193-1.623a11.87 11.87 0 005.851 1.49h.005c6.645 0 12.023-5.378 12.023-12.024 0-3.21-1.251-6.23-3.522-8.492"/>
-          </svg>
-        </div>
-        <h2 class="text-3xl font-bold text-gray-900 dark:text-white">
-          Norte MT Sistemas
-        </h2>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          WhatsApp Chatbot Multi-Tenant
-        </p>
-      </div>
+  <div class="relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-10">
+    <div class="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-emerald-400/35 blur-3xl"></div>
+    <div class="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-orange-300/28 blur-3xl"></div>
 
-      <!-- Form -->
-      <form @submit.prevent="handleLogin" class="mt-8 space-y-6">
-        <!-- Error Alert -->
-        <div 
-          v-if="error" 
-          class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm"
-        >
-          {{ error }}
+    <div class="relative mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+      <section class="hidden min-h-[calc(100vh-4rem)] rounded-[2rem] border border-emerald-200/60 bg-[linear-gradient(160deg,rgba(6,95,70,0.98),rgba(5,150,105,0.92)_58%,rgba(16,185,129,0.88))] p-10 text-emerald-50 shadow-2xl shadow-emerald-900/25 lg:flex lg:flex-col lg:justify-between">
+        <div>
+          <span class="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-50/90">
+            Norte MT Sistemas
+          </span>
+          <h1 class="mt-8 max-w-xl text-4xl font-bold leading-tight tracking-tight">
+            Atendimento WhatsApp com ritmo de operação, não de planilha.
+          </h1>
+          <p class="mt-5 max-w-lg text-sm leading-6 text-emerald-100/90">
+            Centralize conversas, automações e time em uma experiência única, rápida e preparada para operação diária.
+          </p>
         </div>
 
-        <div class="space-y-4">
-          <!-- Email -->
-          <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Email
-            </label>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+            <p class="text-xs uppercase tracking-[0.14em] text-emerald-100/80">Conversas</p>
+            <p class="mt-1 text-2xl font-bold">+1.2k</p>
+            <p class="mt-1 text-xs text-emerald-100/70">Fluxo ativo no dia</p>
+          </div>
+          <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+            <p class="text-xs uppercase tracking-[0.14em] text-emerald-100/80">SLA médio</p>
+            <p class="mt-1 text-2xl font-bold">04m</p>
+            <p class="mt-1 text-xs text-emerald-100/70">Tempo de resposta</p>
+          </div>
+          <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+            <p class="text-xs uppercase tracking-[0.14em] text-emerald-100/80">Equipe</p>
+            <p class="mt-1 text-2xl font-bold">18</p>
+            <p class="mt-1 text-xs text-emerald-100/70">Agentes online</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-[2rem] border border-slate-200/70 bg-white/90 p-7 shadow-[0_24px_80px_rgba(15,23,42,0.14)] backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/88 dark:shadow-black/20 sm:p-8">
+        <div class="mb-8">
+          <div class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-lg font-bold text-white shadow-lg shadow-emerald-600/25">
+            NM
+          </div>
+          <h2 class="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Entrar na plataforma</h2>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            Acesse sua operação e acompanhe o atendimento em tempo real.
+          </p>
+        </div>
+
+        <form @submit.prevent="handleLogin" class="space-y-5">
+          <div
+            v-if="error"
+            class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800/80 dark:bg-rose-900/25 dark:text-rose-300"
+          >
+            {{ error }}
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="email" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
             <input
               id="email"
               v-model="email"
               type="email"
               required
-              class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              autocomplete="email"
+              class="w-full rounded-2xl border border-slate-300/80 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:ring-emerald-900/40"
               placeholder="seu@email.com"
             />
           </div>
 
-          <!-- Password -->
-          <div>
-            <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Senha
-            </label>
-            <input
-              id="password"
-              v-model="password"
-              type="password"
-              required
-              class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              placeholder="••••••••"
-            />
+          <div class="space-y-1.5">
+            <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Senha</label>
+            <div class="relative">
+              <input
+                id="password"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                required
+                autocomplete="current-password"
+                class="w-full rounded-2xl border border-slate-300/80 bg-white px-4 py-3 pr-12 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:ring-emerald-900/40"
+                placeholder="Digite sua senha"
+              />
+              <button
+                type="button"
+                class="absolute inset-y-0 right-0 mr-2 my-2 rounded-xl px-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
+                @click="showPassword = !showPassword"
+              >
+                {{ showPassword ? 'Ocultar' : 'Mostrar' }}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <!-- Submit Button -->
-        <button
-          type="submit"
-          :disabled="isLoading"
-          class="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-        >
-          <svg 
-            v-if="isLoading" 
-            class="w-5 h-5 animate-spin" 
-            fill="none" 
-            viewBox="0 0 24 24"
+          <button
+            type="submit"
+            :disabled="!canSubmit"
+            class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-3 font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:from-emerald-700 hover:to-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
-          {{ isLoading ? 'Entrando...' : 'Entrar' }}
-        </button>
+            <svg v-if="isLoading" class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {{ isLoading ? 'Validando acesso...' : 'Entrar agora' }}
+          </button>
 
-        <!-- Register Link -->
-        <p class="text-center text-sm text-gray-600 dark:text-gray-400">
-          Não tem uma conta?
-          <router-link to="/register" class="text-emerald-500 hover:text-emerald-600 font-medium">
-            Criar conta
-          </router-link>
-        </p>
-      </form>
+          <div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <span>Primeiro acesso ao sistema?</span>
+            <router-link to="/register" class="font-semibold text-emerald-600 transition hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300">
+              Criar conta
+            </router-link>
+          </div>
+        </form>
+      </section>
     </div>
   </div>
 </template>

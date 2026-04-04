@@ -1,98 +1,100 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 interface Props {
   isOpen: boolean
+  userRole?: string
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits(['toggle'])
-
 const route = useRoute()
 
 const menuItems = [
   { path: '/', icon: 'home', label: 'Dashboard' },
   { path: '/tickets', icon: 'chat', label: 'Conversas' },
-  { path: '/instances', icon: 'phone', label: 'Instâncias' },
-  { path: '/contacts', icon: 'users', label: 'Contatos' },
-  { path: '/flows', icon: 'flow', label: 'Automações' },
-  { path: '/reports', icon: 'chart', label: 'Relatórios' },
-  { path: '/settings', icon: 'cog', label: 'Configurações' },
+  { path: '/instances', icon: 'phone', label: 'Instancias' },
+  { path: '/flows', icon: 'flow', label: 'Automacoes' },
+  { path: '/settings', icon: 'cog', label: 'Configuracoes' },
+  { path: '/admin/users', icon: 'shield', label: 'Admin • Usuarios', roles: ['admin', 'manager'] },
 ]
 
-const isActive = (path: string) => {
-  return route.path === path
-}
+const visibleItems = computed(() => {
+  return menuItems.filter((item) => {
+    if (!item.roles?.length) {
+      return true
+    }
+
+    return item.roles.includes(props.userRole || '')
+  })
+})
+
+const isActive = (path: string) => route.path === path
 </script>
 
 <template>
   <aside
     :class="[
-      'fixed inset-y-0 left-0 z-30 flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300',
+      'fixed inset-y-2 left-2 z-30 flex flex-col overflow-hidden rounded-3xl border border-slate-200/70 bg-white/92 shadow-2xl shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-900/88 dark:shadow-black/20 md:inset-y-4 md:left-4',
       isOpen ? 'w-64' : 'w-16'
     ]"
   >
-    <!-- Logo -->
-    <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
+    <div class="flex h-16 items-center justify-between border-b border-slate-200/70 px-4 dark:border-slate-800">
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.405 0 .027 5.378.027 12.024a11.9 11.9 0 001.587 5.947L0 24l6.193-1.623a11.87 11.87 0 005.851 1.49h.005c6.645 0 12.023-5.378 12.023-12.024 0-3.21-1.251-6.23-3.522-8.492"/>
-          </svg>
+        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/25">
+          <span class="text-sm font-bold tracking-[0.18em]">NM</span>
         </div>
-        <span 
-          v-if="isOpen" 
-          class="font-semibold text-gray-800 dark:text-white whitespace-nowrap"
-        >
-          Norte MT
-        </span>
+        <div v-if="isOpen" class="leading-tight">
+          <p class="text-sm font-semibold text-slate-900 dark:text-white">Norte MT</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Control Center</p>
+        </div>
       </div>
     </div>
 
-    <!-- Navigation -->
-    <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+    <div v-if="isOpen" class="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+      Navegacao principal para operacao, atendimento e configuracao.
+    </div>
+
+    <nav class="flex-1 space-y-1 px-3 py-3 overflow-y-auto">
       <router-link
-        v-for="item in menuItems"
+        v-for="item in visibleItems"
         :key="item.path"
         :to="item.path"
+        :title="item.label"
         :class="[
-          'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+          'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
           isActive(item.path)
-            ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            ? 'bg-gradient-to-r from-emerald-500/12 to-orange-400/12 text-emerald-700 ring-1 ring-emerald-400/30 dark:text-emerald-300'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
         ]"
       >
-        <!-- Icons -->
-        <svg v-if="item.icon === 'home'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        <svg v-if="item.icon === 'home'" class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
         </svg>
-        <svg v-else-if="item.icon === 'chat'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        <svg v-else-if="item.icon === 'chat'" class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
-        <svg v-else-if="item.icon === 'phone'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        <svg v-else-if="item.icon === 'phone'" class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
         </svg>
-        <svg v-else-if="item.icon === 'users'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+        <svg v-else-if="item.icon === 'flow'" class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
-        <svg v-else-if="item.icon === 'flow'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        <svg v-else-if="item.icon === 'cog'" class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
-        <svg v-else-if="item.icon === 'chart'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        <svg v-else-if="item.icon === 'shield'" class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l7 4v5c0 5-3.5 9.74-7 10-3.5-.26-7-5-7-10V7l7-4z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4" />
         </svg>
-        <svg v-else-if="item.icon === 'cog'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-        </svg>
-        
+
         <span v-if="isOpen" class="whitespace-nowrap">{{ item.label }}</span>
       </router-link>
     </nav>
 
-    <!-- Footer -->
-    <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-      <div v-if="isOpen" class="text-xs text-gray-500 dark:text-gray-400 text-center">
+    <div class="border-t border-slate-200/70 p-4 dark:border-slate-800">
+      <div v-if="isOpen" class="text-center text-xs text-slate-500 dark:text-slate-400">
         © 2026 Norte MT Sistemas
       </div>
     </div>

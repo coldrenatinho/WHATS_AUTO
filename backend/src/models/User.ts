@@ -1,6 +1,7 @@
 import { Model, DataTypes, Optional } from 'sequelize';
 import sequelize from '../config/database';
 import bcrypt from 'bcryptjs';
+import type Company from './Company';
 
 // ═══════════════════════════════════════════════════════════════
 // Interface & Types
@@ -36,6 +37,7 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   declare is_active: boolean;
   declare last_login_at?: Date;
   declare settings?: Record<string, unknown>;
+  declare company?: Company;
   declare readonly created_at: Date;
   declare readonly updated_at: Date;
   declare deleted_at?: Date;

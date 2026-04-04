@@ -4,6 +4,7 @@ import User from './User';
 import Instance from './Instance';
 import Ticket from './Ticket';
 import Message from './Message';
+import Flow from './Flow';
 
 // ═══════════════════════════════════════════════════════════════
 // Associações entre Models
@@ -41,13 +42,18 @@ Message.belongsTo(Instance, { foreignKey: 'instance_id', as: 'instance' });
 Company.hasMany(Message, { foreignKey: 'company_id', as: 'messages' });
 Message.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
 
+// Company -> Flows (1:N)
+Company.hasMany(Flow, { foreignKey: 'company_id', as: 'flows' });
+Flow.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
+
 export {
   sequelize,
   Company,
   User,
   Instance,
   Ticket,
-  Message
+  Message,
+  Flow
 };
 
 export default {
@@ -56,5 +62,6 @@ export default {
   User,
   Instance,
   Ticket,
-  Message
+  Message,
+  Flow
 };

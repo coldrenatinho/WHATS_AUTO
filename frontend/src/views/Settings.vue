@@ -1,19 +1,102 @@
 <script setup lang="ts">
-// Placeholder for Settings view
+import { computed, onMounted, ref } from 'vue'
+import dayjs from 'dayjs'
+import { toast } from 'vue3-toastify'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+
+const storageKey = 'whatsauto-settings-toggles'
+const savedAtKey = 'whatsauto-settings-toggles-saved-at'
+
+const toggles = ref([
+  { nome: 'Receber alerta de fila alta', ativo: true },
+  { nome: 'Distribuicao automatica de tickets', ativo: true },
+  { nome: 'Modo silencio fora do horario', ativo: false },
+])
+
+const lastSavedAt = ref('')
+
+const activeToggles = computed(() => toggles.value.filter((item) => item.ativo).length)
+
+onMounted(() => {
+  const rawToggles = localStorage.getItem(storageKey)
+  const savedAt = localStorage.getItem(savedAtKey)
+
+  if (rawToggles) {
+    try {
+      const parsed = JSON.parse(rawToggles)
+      if (Array.isArray(parsed)) {
+        toggles.value = parsed
+      }
+    } catch {
+      localStorage.removeItem(storageKey)
+    }
+  }
+
+  if (savedAt) {
+    lastSavedAt.value = savedAt
+  }
+})
+
+const saveSettings = () => {
+  const formatted = dayjs().format('DD/MM/YYYY HH:mm')
+  localStorage.setItem(storageKey, JSON.stringify(toggles.value))
+  localStorage.setItem(savedAtKey, formatted)
+  lastSavedAt.value = formatted
+  toast.success('Preferências salvas com sucesso.')
+}
 </script>
 
 <template>
-  <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Configurações</h1>
-    <p class="text-gray-600 dark:text-gray-400 mt-2">Gerencie as configurações da sua conta</p>
+  <div class="space-y-6">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Configurações</h1>
+        <p class="mt-2 text-gray-600 dark:text-gray-400">Ajustes da sua operacao e preferências da equipe.</p>
+      </div>
+
+      <div class="text-sm text-gray-500 dark:text-gray-400">
+        {{ activeToggles }} de {{ toggles.length }} automações ativas
+      </div>
+    </div>
     
-    <div class="mt-8 bg-white dark:bg-gray-800 rounded-xl p-8 border border-gray-200 dark:border-gray-700 text-center">
-      <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-      </svg>
-      <h3 class="text-lg font-medium text-gray-900 dark:text-white">Em desenvolvimento</h3>
-      <p class="text-gray-600 dark:text-gray-400 mt-1">Esta funcionalidade estará disponível em breve.</p>
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Conta</h2>
+        <div class="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-400">
+          <p><span class="font-semibold text-gray-900 dark:text-gray-100">Empresa:</span> {{ authStore.company?.name || 'Nao informado' }}</p>
+          <p><span class="font-semibold text-gray-900 dark:text-gray-100">Plano:</span> {{ authStore.company?.plan || 'Nao informado' }}</p>
+          <p><span class="font-semibold text-gray-900 dark:text-gray-100">Subdominio:</span> {{ authStore.company?.subdomain || 'Nao informado' }}</p>
+          <p v-if="lastSavedAt"><span class="font-semibold text-gray-900 dark:text-gray-100">Último ajuste:</span> {{ lastSavedAt }}</p>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Automacoes</h2>
+          <button
+            type="button"
+            class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            @click="saveSettings"
+          >
+            Salvar preferências
+          </button>
+        </div>
+        <div class="mt-4 space-y-3">
+          <label v-for="item in toggles" :key="item.nome" class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3 dark:bg-gray-900">
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ item.nome }}</span>
+            <button
+              type="button"
+              class="rounded-full px-3 py-1 text-xs font-semibold transition"
+              :class="item.ativo ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'"
+              @click="item.ativo = !item.ativo"
+            >
+              {{ item.ativo ? 'Ativo' : 'Inativo' }}
+            </button>
+          </label>
+        </div>
+      </div>
     </div>
   </div>
 </template>

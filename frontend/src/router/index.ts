@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
+    roles?: string[]
   }
 }
 
@@ -39,11 +40,27 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/flows',
+    name: 'Flows',
+    component: () => import('../views/Flows.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('../views/Settings.vue'),
     meta: { requiresAuth: true }
   },
+  {
+    path: '/admin/users',
+    name: 'AdminUsers',
+    component: () => import('../views/AdminUsers.vue'),
+    meta: { requiresAuth: true, roles: ['admin', 'manager'] }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
+  }
 ]
 
 const router = createRouter({
@@ -52,11 +69,22 @@ const router = createRouter({
 })
 
 // Navigation Guard
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
+
+  if (authStore.isAuthenticated && !authStore.user) {
+    await authStore.fetchUser()
+  }
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return '/login'
+  }
+
+  if (to.meta.roles?.length) {
+    const userRole = authStore.user?.role
+    if (!userRole || !to.meta.roles.includes(userRole)) {
+      return '/'
+    }
   } else if (!to.meta.requiresAuth && authStore.isAuthenticated) {
     return '/'
   }

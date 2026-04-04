@@ -1,6 +1,57 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, Company } from '../models';
+import logger from '../utils';
+
+type RateLimitEntry = {
+  count: number;
+  resetAt: number;
+};
+
+interface RateLimitOptions {
+  windowMs: number;
+  max: number;
+  message: string;
+  keyGenerator?: (req: Request) => string;
+}
+
+const createInMemoryRateLimit = ({
+  windowMs,
+  max,
+  message,
+  keyGenerator,
+}: RateLimitOptions) => {
+  const hits = new Map<string, RateLimitEntry>();
+
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const key = keyGenerator?.(req) || req.ip || req.socket.remoteAddress || 'anonymous';
+    const now = Date.now();
+    const entry = hits.get(key);
+
+    if (!entry || entry.resetAt <= now) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      next();
+      return;
+    }
+
+    if (entry.count >= max) {
+      res.status(429).json({
+        error: message,
+      });
+      return;
+    }
+
+    entry.count += 1;
+    hits.set(key, entry);
+    next();
+  };
+};
+
+export const authRateLimit = createInMemoryRateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Muitas tentativas. Tente novamente em alguns minutos.',
+});
 
 // ═══════════════════════════════════════════════════════════════
 // Tipos
@@ -34,7 +85,13 @@ export const authMiddleware = async (
     }
 
     const token = authHeader.substring(7);
-    const secret = process.env.JWT_SECRET || 'default_secret';
+    const secret = process.env.JWT_SECRET;
+
+    if (!secret) {
+      logger.error('JWT_SECRET nao configurado');
+      res.status(500).json({ error: 'Configuracao de autenticacao ausente' });
+      return;
+    }
 
     const decoded = jwt.verify(token, secret) as JwtPayload;
 
@@ -82,11 +139,11 @@ export const roleMiddleware = (...allowedRoles: string[]) => {
 
 export const errorHandler = (
   error: Error,
-  req: Request,
+  _req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  console.error('Error:', error);
+  logger.error('Erro nao tratado', error);
 
   if (res.headersSent) {
     next(error);

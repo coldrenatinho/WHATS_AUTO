@@ -1,4 +1,37 @@
 services:
+  # ─── Traefik (Reverse Proxy) ─────────────────────────────────────
+  traefik:
+    image: traefik:v3.1
+    container_name: whatsauto_traefik
+    restart: unless-stopped
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:-seu-email@exemplo.com}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - bot_network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`traefik.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.traefik.entrypoints=websecure
+      - traefik.http.routers.traefik.tls=true
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.tls.certresolver=le
+
   # ═══════════════════════════════════════════════════════════════
   # NORTE MT SISTEMAS - WhatsApp Chatbot Multi-Tenant
   # Repositório: https://nortemtsistemas.com.br/
@@ -11,31 +44,45 @@ services:
       dockerfile: Dockerfile
     container_name: whatsauto_backend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://nortemtsistemas.com.br,https://api.nortemtsistemas.com.br,https://n8n.nortemtsistemas.com.br,https://evolution.nortemtsistemas.com.br}
+      - DB_SYNC_ON_STARTUP=${DB_SYNC_ON_STARTUP:-true}
       - DB_HOST=mariadb
       - DB_PORT=3306
       - DB_NAME=${DB_NAME:-whatsauto}
       - DB_USER=${DB_USER:-whatsauto}
       - DB_PASS=${DB_PASS:-whatsauto123}
-      - JWT_SECRET=${JWT_SECRET:-sua_chave_jwt_super_secreta}
+      - JWT_SECRET=${JWT_SECRET}
       - EVOLUTION_SERVER_URL=http://evolution:8080
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - N8N_WEBHOOK_URL=http://n8n:5678
+      - BUSINESS_NAME=${BUSINESS_NAME}
+      - COMPANY_SUBDOMAIN=${COMPANY_SUBDOMAIN:-norte}
+      - HUMAN_PHONE=${HUMAN_PHONE}
+      - ADMIN_NAME=${ADMIN_NAME:-Administrador}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ADMIN_RESET_PASSWORD=${ADMIN_RESET_PASSWORD:-false}
     networks:
       - bot_network
     depends_on:
       mariadb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.backend.rule=Host(`api.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.backend.entrypoints=websecure
+      - traefik.http.routers.backend.tls=true
+      - traefik.http.routers.backend.tls.certresolver=le
+      - traefik.http.services.backend.loadbalancer.server.port=3000
 
   # ─── Frontend (Vue.js + Tailwind CSS) ───────────────────────────
   frontend:
@@ -44,22 +91,25 @@ services:
       dockerfile: Dockerfile
     container_name: whatsauto_frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
     environment:
       - VITE_API_URL=${API_URL:-https://api.nortemtsistemas.com.br}
     networks:
       - bot_network
     depends_on:
       - backend
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=Host(`${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.frontend.entrypoints=websecure
+      - traefik.http.routers.frontend.tls=true
+      - traefik.http.routers.frontend.tls.certresolver=le
+      - traefik.http.services.frontend.loadbalancer.server.port=80
 
   # ─── n8n (Automação) ────────────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
     container_name: n8n_bot
     restart: unless-stopped
-    ports:
-      - "5678:5678"
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER}
@@ -86,14 +136,19 @@ services:
       - bot_network
     depends_on:
       - backend
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.n8n.rule=Host(`n8n.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.n8n.entrypoints=websecure
+      - traefik.http.routers.n8n.tls=true
+      - traefik.http.routers.n8n.tls.certresolver=le
+      - traefik.http.services.n8n.loadbalancer.server.port=5678
 
   # ─── Evolution API (WhatsApp) ────────────────────────────────────
   evolution:
     image: atendai/evolution-api:v2.1.1
     container_name: evolution_api
     restart: unless-stopped
-    ports:
-      - "8080:8080"
     environment:
       - SERVER_URL=${EVOLUTION_SERVER_URL:-https://evolution.nortemtsistemas.com.br}
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
@@ -120,10 +175,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.evolution.rule=Host(`evolution.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.evolution.entrypoints=websecure
+      - traefik.http.routers.evolution.tls=true
+      - traefik.http.routers.evolution.tls.certresolver=le
+      - traefik.http.services.evolution.loadbalancer.server.port=8080
 
   # ─── MariaDB (Banco Principal) ──────────────────────────────────
   mariadb:
-    image: mariadb:11.4-latest
+    image: mariadb:11.4
     container_name: whatsauto_mariadb
     restart: unless-stopped
     ports:
@@ -169,8 +231,6 @@ services:
     image: redis:7-alpine
     container_name: whatsauto_redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -187,6 +247,7 @@ volumes:
   postgres_data:
   mariadb_data:
   redis_data:
+  traefik_letsencrypt:
 
 networks:
   bot_network:
