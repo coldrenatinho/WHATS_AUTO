@@ -5,7 +5,7 @@ services:
     container_name: whatsauto_traefik
     restart: unless-stopped
     command:
-      - --api.dashboard=true
+      - --api.dashboard=false
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
@@ -48,7 +48,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://nortemtsistemas.com.br,https://api.nortemtsistemas.com.br,https://n8n.nortemtsistemas.com.br,https://evolution.nortemtsistemas.com.br}
-      - DB_SYNC_ON_STARTUP=${DB_SYNC_ON_STARTUP:-true}
+      - DB_SYNC_ON_STARTUP=${DB_SYNC_ON_STARTUP:-false}
       - DB_HOST=mariadb
       - DB_PORT=3306
       - DB_NAME=${DB_NAME:-whatsauto}
@@ -57,6 +57,16 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - EVOLUTION_SERVER_URL=http://evolution:8080
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - REVOLUTION_API_MODE=${REVOLUTION_API_MODE:-mock}
+      - REVOLUTION_API_URL=${REVOLUTION_API_URL:-}
+      - REVOLUTION_API_KEY=${REVOLUTION_API_KEY:-}
+      - REVOLUTION_ENDPOINT_LIST=${REVOLUTION_ENDPOINT_LIST:-/instance/fetchInstances}
+      - REVOLUTION_ENDPOINT_CREATE=${REVOLUTION_ENDPOINT_CREATE:-/instance/create}
+      - REVOLUTION_ENDPOINT_CONNECT=${REVOLUTION_ENDPOINT_CONNECT:-/instance/connect/{instanceName}}
+      - REVOLUTION_ENDPOINT_DISCONNECT=${REVOLUTION_ENDPOINT_DISCONNECT:-/instance/logout/{instanceName}}
+      - REVOLUTION_ENDPOINT_STATUS=${REVOLUTION_ENDPOINT_STATUS:-/instance/connectionState/{instanceName}}
+      - REVOLUTION_ENDPOINT_QRCODE=${REVOLUTION_ENDPOINT_QRCODE:-/instance/connect/{instanceName}}
+      - REVOLUTION_ENDPOINT_SEND_TEXT=${REVOLUTION_ENDPOINT_SEND_TEXT:-/message/sendText/{instanceName}}
       - N8N_WEBHOOK_URL=http://n8n:5678
       - BUSINESS_NAME=${BUSINESS_NAME}
       - COMPANY_SUBDOMAIN=${COMPANY_SUBDOMAIN:-norte}
@@ -188,8 +198,6 @@ services:
     image: mariadb:11.4
     container_name: whatsauto_mariadb
     restart: unless-stopped
-    ports:
-      - "3306:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASS:-root_super_secret}
       - MYSQL_DATABASE=${DB_NAME:-whatsauto}

@@ -20,6 +20,8 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 	.map((origin) => origin.trim())
 	.filter(Boolean);
 
+const docsEnabled = process.env.ENABLE_API_DOCS === 'true' || process.env.NODE_ENV !== 'production';
+
 const app = express();
 
 app.disable('x-powered-by');
@@ -68,11 +70,13 @@ app.use(
 );
 app.use(express.json({ limit: '1mb' }));
 
-app.get('/api/docs.json', (_req, res) => {
-	return res.json(openApiSpec);
-});
+if (docsEnabled) {
+	app.get('/api/docs.json', (_req, res) => {
+		return res.json(openApiSpec);
+	});
 
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+	app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+}
 
 app.use('/api', routes);
 

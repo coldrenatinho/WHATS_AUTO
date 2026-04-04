@@ -21,11 +21,11 @@ class BootstrapService {
     logger.info('Iniciando bootstrap do banco');
     await sequelize.authenticate();
 
-    const shouldSyncSchema = process.env.DB_SYNC_ON_STARTUP !== 'false';
+    const shouldSyncSchema = process.env.DB_SYNC_ON_STARTUP === 'true';
 
     if (shouldSyncSchema) {
       await sequelize.sync();
-      logger.info('Banco autenticado e sincronizado');
+      logger.warn('Banco autenticado e sincronizado por DB_SYNC_ON_STARTUP=true');
     } else {
       logger.info('Banco autenticado sem sync automatico do schema');
     }
@@ -34,7 +34,10 @@ class BootstrapService {
     const subdomain = normalizeSubdomain(process.env.COMPANY_SUBDOMAIN || 'principal') || 'principal';
     const adminName = process.env.ADMIN_NAME || 'Administrador';
     const adminEmail = process.env.ADMIN_EMAIL || `admin@${subdomain}.local`;
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123456';
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword) {
+      throw new Error('ADMIN_PASSWORD nao configurado para bootstrap');
+    }
     const humanPhone = process.env.HUMAN_PHONE;
 
     const [company, companyCreated] = await Company.findOrCreate({
