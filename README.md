@@ -39,6 +39,25 @@ Plataforma multi-tenant de atendimento WhatsApp da Norte MT Sistemas, com backen
 - O frontend possui testes unitários com Vitest, além de lint, build com Vite e validação de tipos com Vue TSC.
 - Para validação local completa do frontend, execute `npm run test`, `npm run lint` e `npm run build` dentro de `frontend/`.
 
+## 🚀 Entrega Contínua (CI/CD)
+
+O projeto utiliza **GitHub Actions** para automação completa:
+
+- **CI (Integração Contínua)**: Lint, build e testes em cada push/PR
+- **CD (Deploy Contínuo)**: Deploy automático com smoke tests e notificações Slack
+- **Validação Pré-Deploy**: Workflow manual para validar antes de produção
+- **Release Automática**: Cria releases em tags `v*`
+
+📖 **Documentação:**
+- [WORKFLOWS.md](.github/WORKFLOWS.md) - Guia de uso dos workflows
+- [DEPLOYMENT.md](.github/DEPLOYMENT.md) - Setup de secrets e configuração
+
+**Resumo do fluxo:**
+1. Push/PR → CI (lint, build, testes, Docker) ✅
+2. Merge em `main` → CD (build, deploy, smoke tests) 🚀
+3. Rollback automático se falhar ↩️
+4. Notificação Slack 💬
+
 ## Integrações e Observações
 
 - A integração com a Evolution API está em modo mock no serviço de revolução, útil para desenvolvimento e testes locais.

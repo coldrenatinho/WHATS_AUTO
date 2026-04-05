@@ -102,12 +102,23 @@ jobs:
     environment:
       name: production
       url: https://nortemtsistemas.com.br
+    
+    outputs:
+      deployment_id: ${{ steps.deploy.outputs.deployment_id }}
+      previous_commit: ${{ steps.deploy.outputs.previous_commit }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Save Previous Commit
+        id: deploy
+        run: |
+          echo "deployment_id=$(date +%s)" >> $GITHUB_OUTPUT
+          echo "previous_commit=$(git rev-parse HEAD~1)" >> $GITHUB_OUTPUT
+
       - name: Deploy to Server
+        id: deploy_step
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -115,6 +126,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /opt/whatsauto
+            
+            # Backup current state for rollback
+            docker compose ps > /tmp/compose_state_before.txt
+            git rev-parse HEAD > /tmp/commit_before.txt
             
             # Pull latest images
             docker compose pull
@@ -125,18 +140,120 @@ jobs:
             # Clean up old images
             docker image prune -f
             
-            # Health check
-            sleep 10
-            curl -f https://api.nortemtsistemas.com.br/health || exit 1
+            # Wait for services to be ready
+            sleep 15
 
-      - name: Notify on Success
+      - name: Run Smoke Tests
+        id: smoke_tests
+        run: |
+          chmod +x .github/scripts/smoke-tests.sh
+          .github/scripts/smoke-tests.sh "https://api.nortemtsistemas.com.br"
+
+      - name: Notify Success on Slack
         if: success()
-        run: |
-          echo "✅ Deploy successful!"
-          echo "URL: https://nortemtsistemas.com.br"
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "✅ Deploy para Produção Bem-sucedido",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*✅ Deploy para Produção Bem-sucedido*\n*Commit:* ${{ github.sha }}\n*Branch:* main\n*URL:* https://nortemtsistemas.com.br\n*Status:* Todos os smoke tests passaram ✓"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Ver Deploy"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Abrir Aplicação"
+                      },
+                      "url": "https://nortemtsistemas.com.br"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Notify on Failure
+      - name: Rollback on Failure
+        if: failure() && steps.deploy_step.outcome == 'success'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/whatsauto
+            
+            echo "🔄 Iniciando rollback automático..."
+            
+            # Revert to previous image state
+            docker compose down
+            docker compose pull
+            git checkout $(cat /tmp/commit_before.txt)
+            docker compose up -d --remove-orphans
+            
+            # Verify rollback
+            sleep 15
+            if curl -f https://api.nortemtsistemas.com.br/health > /dev/null 2>&1; then
+              echo "✅ Rollback concluído com sucesso"
+              exit 0
+            else
+              echo "❌ Falha no rollback"
+              exit 1
+            fi
+
+      - name: Notify Failure on Slack
         if: failure()
-        run: |
-          echo "❌ Deploy failed!"
-          exit 1
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "❌ Deploy para Produção Falhou",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*❌ Deploy para Produção Falhou*\n*Commit:* ${{ github.sha }}\n*Branch:* main\n*Status:* Rollback automático foi acionado"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Motivo da Falha:*\n${{ job.status }}\n\nVerifique os logs para mais detalhes."
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Ver Logs"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
