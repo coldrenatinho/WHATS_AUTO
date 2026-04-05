@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue3-toastify'
 import api from '../services/api'
+import type { AxiosError } from 'axios'
 
 interface Ticket {
   id: number
@@ -14,10 +15,24 @@ interface Ticket {
   updated_at?: string
 }
 
+interface InstanceOption {
+  id: number
+  name: string
+}
+
 const tickets = ref<Ticket[]>([])
 const loading = ref(true)
 const searchQuery = ref('')
 const updatingTicketId = ref<number | null>(null)
+const creatingTicket = ref(false)
+const instances = ref<InstanceOption[]>([])
+
+const newChatForm = ref({
+  instanceId: '',
+  contactName: '',
+  contactPhone: '',
+  firstMessage: '',
+})
 
 const statusLabel: Record<Ticket['status'], string> = {
   open: 'Aberto',
@@ -64,6 +79,89 @@ const loadTickets = async () => {
   }
 }
 
+const loadInstances = async () => {
+  const { data } = await api.get('/instances')
+  instances.value = data.map((instance: { id: number; name: string }) => ({
+    id: instance.id,
+    name: instance.name,
+  }))
+
+  if (!newChatForm.value.instanceId && instances.value.length > 0) {
+    newChatForm.value.instanceId = String(instances.value[0].id)
+  }
+}
+
+const createChat = async () => {
+  const instanceId = Number(newChatForm.value.instanceId)
+  const contactPhone = newChatForm.value.contactPhone.trim().replace(/\D+/g, '')
+
+  if (!Number.isFinite(instanceId) || instanceId <= 0 || !contactPhone) {
+    toast.error('Selecione a instância e informe o telefone do contato.')
+    return
+  }
+
+  if (contactPhone.length < 10) {
+    toast.error('Informe o telefone com DDI e DDD, apenas números.')
+    return
+  }
+
+  creatingTicket.value = true
+
+  try {
+    const { data } = await api.post('/tickets', {
+      instance_id: instanceId,
+      contact_phone: contactPhone,
+      contact_name: newChatForm.value.contactName.trim() || undefined,
+      status: 'open',
+      priority: 'medium',
+    })
+
+    const firstMessage = newChatForm.value.firstMessage.trim()
+
+    let firstMessageFailed = false
+
+    if (firstMessage) {
+      try {
+        await api.post(`/messages/tickets/${data.id}/text`, {
+          text: firstMessage,
+        })
+      } catch (error) {
+        firstMessageFailed = true
+        const requestError = error as AxiosError<{ error?: string }>
+        const rawMessage = requestError.response?.data?.error || ''
+
+        const friendlyMessage = rawMessage.includes('exists":false') || rawMessage.toLowerCase().includes('bad request')
+          ? 'Conversa criada, mas a primeira mensagem falhou porque o número não foi reconhecido no WhatsApp.'
+          : rawMessage
+            ? `Conversa criada, mas a primeira mensagem falhou: ${rawMessage}`
+            : 'Conversa criada, mas a primeira mensagem não foi enviada.'
+
+        toast.warning(friendlyMessage)
+      }
+    }
+
+    if (!firstMessageFailed) {
+      toast.success('Nova conversa iniciada com sucesso.')
+    }
+
+    newChatForm.value = {
+      ...newChatForm.value,
+      contactName: '',
+      contactPhone: '',
+      firstMessage: '',
+    }
+
+    await loadTickets()
+  } catch (error) {
+    const requestError = error as AxiosError<{ error?: string }>
+    const backendMessage = requestError.response?.data?.error
+
+    toast.error(backendMessage || 'Não foi possível iniciar a conversa.')
+  } finally {
+    creatingTicket.value = false
+  }
+}
+
 const updateStatus = async (ticketId: number, status: Ticket['status']) => {
   updatingTicketId.value = ticketId
 
@@ -89,7 +187,7 @@ const handleStatusChange = (ticketId: number, event: Event) => {
 }
 
 onMounted(async () => {
-  await loadTickets()
+  await Promise.all([loadTickets(), loadInstances()])
 })
 </script>
 
@@ -114,6 +212,54 @@ onMounted(async () => {
           class="w-full rounded-xl border border-gray-300 bg-white py-3 pl-9 pr-4 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
         />
       </label>
+    </div>
+
+    <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Iniciar novo chat</h2>
+      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Crie uma conversa manual e envie a primeira mensagem (opcional).</p>
+
+      <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <select
+          v-model="newChatForm.instanceId"
+          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+        >
+          <option value="" disabled>Selecione a instância</option>
+          <option v-for="instance in instances" :key="instance.id" :value="String(instance.id)">
+            {{ instance.name }}
+          </option>
+        </select>
+
+        <input
+          v-model="newChatForm.contactPhone"
+          type="text"
+          placeholder="Telefone do contato (com DDI)"
+          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+        />
+
+        <input
+          v-model="newChatForm.contactName"
+          type="text"
+          placeholder="Nome do contato (opcional)"
+          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+        />
+
+        <input
+          v-model="newChatForm.firstMessage"
+          type="text"
+          placeholder="Primeira mensagem (opcional)"
+          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+        />
+      </div>
+
+      <div class="mt-4">
+        <button
+          class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+          :disabled="creatingTicket"
+          @click="createChat"
+        >
+          {{ creatingTicket ? 'Iniciando...' : 'Iniciar conversa' }}
+        </button>
+      </div>
     </div>
     
     <div v-if="loading" class="rounded-xl border border-gray-200 bg-white p-4 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
