@@ -12,10 +12,10 @@ services:
   #     - --entrypoints.web.http.redirections.entrypoint.to=websecure
   #     - --entrypoints.web.http.redirections.entrypoint.scheme=https
   #     - --entrypoints.websecure.address=:443
-  #     - --certificatesresolvers.le.acme.email=${ACME_EMAIL:-seu-email@exemplo.com}
-  #     - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
-  #     - --certificatesresolvers.le.acme.httpchallenge=true
-  #     - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+  #     - --certificatesresolvers.myresolver.acme.email=${ACME_EMAIL:-seu-email@exemplo.com}
+  #     - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
+  #     - --certificatesresolvers.myresolver.acme.httpchallenge=true
+  #     - --certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web
   #   ports:
   #     - "80:80"
   #     - "443:443"
@@ -30,7 +30,7 @@ services:
   #     - traefik.http.routers.traefik.entrypoints=websecure
   #     - traefik.http.routers.traefik.tls=true
   #     - traefik.http.routers.traefik.service=api@internal
-  #     - traefik.http.routers.traefik.tls.certresolver=le
+  #     - traefik.http.routers.traefik.tls.certresolver=myresolver
 
   # ═══════════════════════════════════════════════════════════════
   # NORTE MT SISTEMAS - WhatsApp Chatbot Multi-Tenant
@@ -77,6 +77,7 @@ services:
       - ADMIN_RESET_PASSWORD=${ADMIN_RESET_PASSWORD:-false}
     networks:
       - bot_network
+      - traefik-public
     depends_on:
       mariadb:
         condition: service_healthy
@@ -88,6 +89,7 @@ services:
       start_period: 40s
     labels:
       - traefik.enable=true
+      - traefik.docker.network=traefik-public
       - traefik.http.routers.backend.rule=Host(`api.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
       - traefik.http.routers.backend.entrypoints=websecure
       - traefik.http.routers.backend.tls=true
@@ -105,10 +107,12 @@ services:
       - VITE_API_URL=${API_URL:-https://api.nortemtsistemas.com.br}
     networks:
       - bot_network
+      - traefik-public
     depends_on:
       - backend
     labels:
       - traefik.enable=true
+      - traefik.docker.network=traefik-public
       - traefik.http.routers.frontend.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls=true
@@ -182,11 +186,13 @@ services:
       - evolution_data:/evolution/instances
     networks:
       - bot_network
+      - traefik-public
     depends_on:
       postgres:
         condition: service_healthy
     labels:
       - traefik.enable=true
+      - traefik.docker.network=traefik-public
       - traefik.http.routers.evolution.rule=Host(`evolution.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
       - traefik.http.routers.evolution.entrypoints=websecure
       - traefik.http.routers.evolution.tls=true
@@ -260,3 +266,5 @@ volumes:
 networks:
   bot_network:
     driver: bridge
+  traefik-public:
+    external: true
