@@ -160,16 +160,23 @@ services:
 
   # ─── Evolution API (WhatsApp) ────────────────────────────────────
   evolution:
-    image: atendai/evolution-api:latest
+    image: atendai/evolution-api:v2.3.7
     container_name: evolution_api
     restart: unless-stopped
     environment:
+      - NODE_OPTIONS=--dns-result-order=ipv4first
       - SERVER_URL=${EVOLUTION_SERVER_URL:-https://evolution.nortemtsistemas.com.br}
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - WEBSOCKET_ENABLED=true
+      - WEBSOCKET_GLOBAL_EVENTS=true
+      - WEBSOCKET_EVENTS_QRCODE_UPDATED=true
+      - WEBSOCKET_EVENTS_CONNECTION_UPDATE=true
       - CACHE_REDIS_ENABLED=false
-      - LOG_LEVEL=ERROR
+      - LOG_LEVEL=DEBUG
+      - LOG_BAILEYS=debug
+      - CONFIG_SESSION_PHONE_VERSION=
       - LOG_COLOR=true
       - DEL_INSTANCE=false
       - QRCODE_LIMIT=30
