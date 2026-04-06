@@ -47,7 +47,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://nortemtsistemas.com.br,https://api.nortemtsistemas.com.br,https://n8n.nortemtsistemas.com.br,https://evolution.nortemtsistemas.com.br}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://nortemtsistemas.com.br,https://chat.nortemtsistemas.com.br,https://api.nortemtsistemas.com.br,https://n8n.nortemtsistemas.com.br,https://evolution.nortemtsistemas.com.br}
       - DB_SYNC_ON_STARTUP=${DB_SYNC_ON_STARTUP:-false}
       - DB_HOST=mariadb
       - DB_PORT=3306
@@ -78,6 +78,7 @@ services:
     networks:
       - traefik_public
       - bot_network
+      - traefik-public
     depends_on:
       mariadb:
         condition: service_healthy
@@ -89,10 +90,11 @@ services:
       start_period: 40s
     labels:
       - traefik.enable=true
+      - traefik.docker.network=traefik-public
       - traefik.http.routers.backend.rule=Host(`api.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
       - traefik.http.routers.backend.entrypoints=websecure
       - traefik.http.routers.backend.tls=true
-      - traefik.http.routers.backend.tls.certresolver=le
+      - traefik.http.routers.backend.tls.certresolver=myresolver
       - traefik.http.services.backend.loadbalancer.server.port=3000
 
   # ─── Frontend (Vue.js + Tailwind CSS) ───────────────────────────
@@ -107,15 +109,21 @@ services:
     networks:
       - traefik_public
       - bot_network
+      - traefik-public
     depends_on:
       - backend
     labels:
       - traefik.enable=true
-      - traefik.http.routers.frontend.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.frontend.rule=Host(`${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls=true
-      - traefik.http.routers.frontend.tls.certresolver=le
+      - traefik.http.routers.frontend.tls.certresolver=myresolver
       - traefik.http.services.frontend.loadbalancer.server.port=80
+      - traefik.http.routers.frontend-chat.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.frontend-chat.entrypoints=websecure
+      - traefik.http.routers.frontend-chat.tls=true
+      - traefik.http.routers.frontend-chat.tls.certresolver=myresolver
+      - traefik.http.routers.frontend-chat.service=frontend
 
   # ─── n8n (Automação) ────────────────────────────────────────────
   # n8n:
@@ -158,16 +166,23 @@ services:
 
   # ─── Evolution API (WhatsApp) ────────────────────────────────────
   evolution:
-    image: atendai/evolution-api:v2.1.1
+    image: atendai/evolution-api:latest
     container_name: evolution_api
     restart: unless-stopped
     environment:
+      - NODE_OPTIONS=--dns-result-order=ipv4first
       - SERVER_URL=${EVOLUTION_SERVER_URL:-https://evolution.nortemtsistemas.com.br}
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - WEBSOCKET_ENABLED=true
+      - WEBSOCKET_GLOBAL_EVENTS=true
+      - WEBSOCKET_EVENTS_QRCODE_UPDATED=true
+      - WEBSOCKET_EVENTS_CONNECTION_UPDATE=true
       - CACHE_REDIS_ENABLED=false
-      - LOG_LEVEL=ERROR
+      - LOG_LEVEL=DEBUG
+      - LOG_BAILEYS=debug
+      - CONFIG_SESSION_PHONE_VERSION=
       - LOG_COLOR=true
       - DEL_INSTANCE=false
       - QRCODE_LIMIT=30
@@ -185,15 +200,17 @@ services:
     networks:
       - traefik_public
       - bot_network
+      - traefik-public
     depends_on:
       postgres:
         condition: service_healthy
     labels:
       - traefik.enable=true
+      - traefik.docker.network=traefik-public
       - traefik.http.routers.evolution.rule=Host(`evolution.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
       - traefik.http.routers.evolution.entrypoints=websecure
       - traefik.http.routers.evolution.tls=true
-      - traefik.http.routers.evolution.tls.certresolver=le
+      - traefik.http.routers.evolution.tls.certresolver=myresolver
       - traefik.http.services.evolution.loadbalancer.server.port=8080
 
   # ─── MariaDB (Banco Principal) ──────────────────────────────────
@@ -268,3 +285,5 @@ networks:
     external: true
   bot_network:
     driver: bridge
+  traefik-public:
+    external: true
