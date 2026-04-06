@@ -114,7 +114,7 @@ services:
       - backend
     labels:
       - traefik.enable=true
-      - traefik.http.routers.frontend.rule=Host(`${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.frontend.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls=true
       - traefik.http.routers.frontend.tls.certresolver=myresolver
