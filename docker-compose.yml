@@ -91,11 +91,11 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=traefik-public
-      - traefik.http.routers.backend.rule=Host(`api.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
-      - traefik.http.routers.backend.entrypoints=websecure
-      - traefik.http.routers.backend.tls=true
-      - traefik.http.routers.backend.tls.certresolver=myresolver
-      - traefik.http.services.backend.loadbalancer.server.port=3000
+      - traefik.http.routers.backend-api-chat.rule=Host(`api.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.backend-api-chat.entrypoints=websecure
+      - traefik.http.routers.backend-api-chat.tls=true
+      - traefik.http.routers.backend-api-chat.tls.certresolver=myresolver
+      - traefik.http.services.backend-api-chat.loadbalancer.server.port=3000
 
   # ─── Frontend (Vue.js + Tailwind CSS) ───────────────────────────
   frontend:
