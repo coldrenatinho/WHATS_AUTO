@@ -114,11 +114,11 @@ services:
       - backend
     labels:
       - traefik.enable=true
-      - traefik.http.routers.frontend.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
-      - traefik.http.routers.frontend.entrypoints=websecure
-      - traefik.http.routers.frontend.tls=true
-      - traefik.http.routers.frontend.tls.certresolver=myresolver
-      - traefik.http.services.frontend.loadbalancer.server.port=80
+      - traefik.http.routers.frontend-chat.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
+      - traefik.http.routers.frontend-chat.entrypoints=websecure
+      - traefik.http.routers.frontend-chat.tls=true
+      - traefik.http.routers.frontend-chat.tls.certresolver=myresolver
+      - traefik.http.services.frontend-chat.loadbalancer.server.port=80
       - traefik.http.routers.frontend-chat.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
       - traefik.http.routers.frontend-chat.entrypoints=websecure
       - traefik.http.routers.frontend-chat.tls=true
