@@ -5,8 +5,10 @@ import { AuthRequest } from '../middlewares';
 import managementService, {
   CreateFlowInput,
   CreateInstanceInput,
+  CreateMessageTemplateInput,
   CreateTicketInput,
   CreateUserInput,
+  TransferTicketInput,
   UpdateFlowInput,
   UpdateInstanceInput,
   UpdateTicketInput,
@@ -198,28 +200,63 @@ class ManagementController {
     }
   }
 
-  async getFlowWorkspace(req: AuthRequest, res: Response): Promise<void> {
+  // ─── Métodos de Templates de Mensagem ────────────────────────
+  async listMessageTemplates(req: AuthRequest, res: Response): Promise<void> {
     try {
       const companyId = this.requireCompanyId(req);
-      const flowId = this.parseIdParam(req.params.id);
-      const workspace = await managementService.getFlowWorkspace(companyId, flowId);
-      res.json({ workspaceModel: workspace });
+      const templates = await managementService.listMessageTemplates(companyId);
+      res.json(templates);
     } catch (error) {
-      logger.error('Falha ao buscar workspace de fluxo', error);
-      sendControllerError(res, error, 'Erro ao buscar workspace do fluxo');
+      sendControllerError(res, error, 'Erro ao listar templates');
     }
   }
 
-  async saveFlowWorkspace(req: AuthRequest, res: Response): Promise<void> {
+  async createMessageTemplate(req: AuthRequest, res: Response): Promise<void> {
     try {
       const companyId = this.requireCompanyId(req);
-      const flowId = this.parseIdParam(req.params.id);
-      const payload = req.body as { workspaceModel?: unknown };
-      const workspace = await managementService.saveFlowWorkspace(companyId, flowId, payload.workspaceModel);
-      res.json({ workspaceModel: workspace });
+      const template = await managementService.createMessageTemplate(companyId, req.body as CreateMessageTemplateInput);
+      res.status(201).json(template);
     } catch (error) {
-      logger.error('Falha ao salvar workspace de fluxo', error);
-      sendControllerError(res, error, 'Erro ao salvar workspace do fluxo');
+      logger.error('Falha ao criar template', error);
+      sendControllerError(res, error, 'Erro ao criar template');
+    }
+  }
+
+  async updateMessageTemplate(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const companyId = this.requireCompanyId(req);
+      const templateId = this.parseIdParam(req.params.id);
+      const template = await managementService.updateMessageTemplate(companyId, templateId, req.body as Partial<CreateMessageTemplateInput>);
+      res.json(template);
+    } catch (error) {
+      logger.error('Falha ao atualizar template', error);
+      sendControllerError(res, error, 'Erro ao atualizar template');
+    }
+  }
+
+  async deleteMessageTemplate(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const companyId = this.requireCompanyId(req);
+      const templateId = this.parseIdParam(req.params.id);
+      await managementService.deleteMessageTemplate(companyId, templateId);
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Falha ao deletar template', error);
+      sendControllerError(res, error, 'Erro ao deletar template');
+    }
+  }
+
+  // ─── Métodos de Transferência de Tickets ────────────────────────
+  async transferTicket(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const companyId = this.requireCompanyId(req);
+      const ticketId = this.parseIdParam(req.params.id);
+      const ticket = await managementService.transferTicket(companyId, ticketId, req.body as TransferTicketInput);
+      emitTicketUpdated(ticket);
+      res.json(ticket);
+    } catch (error) {
+      logger.error('Falha ao transferir conversa', error);
+      sendControllerError(res, error, 'Erro ao transferir conversa');
     }
   }
 }

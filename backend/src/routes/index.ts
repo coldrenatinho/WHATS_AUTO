@@ -111,15 +111,20 @@ routes.get('/dashboard/summary', managementController.dashboard.bind(managementC
 routes.get('/tickets', managementController.listTickets.bind(managementController));
 routes.post('/tickets', managementController.createTicket.bind(managementController));
 routes.patch('/tickets/:id', managementController.updateTicket.bind(managementController));
+routes.post('/tickets/:id/transfer', roleMiddleware('admin', 'manager', 'agent'), managementController.transferTicket.bind(managementController));
 routes.get('/messages/tickets/:ticketId', messagesController.listTicketMessages.bind(messagesController));
 routes.post('/messages/tickets/:ticketId/text', roleMiddleware('admin', 'manager', 'agent', 'viewer'), messagesController.sendTextToTicket.bind(messagesController));
+
+// Templates de Mensagem
+routes.get('/templates/messages', managementController.listMessageTemplates.bind(managementController));
+routes.post('/templates/messages', roleMiddleware('admin', 'manager'), managementController.createMessageTemplate.bind(managementController));
+routes.patch('/templates/messages/:id', roleMiddleware('admin', 'manager'), managementController.updateMessageTemplate.bind(managementController));
+routes.delete('/templates/messages/:id', roleMiddleware('admin', 'manager'), managementController.deleteMessageTemplate.bind(managementController));
 
 // Fluxos
 routes.get('/flows', managementController.listFlows.bind(managementController));
 routes.post('/flows', roleMiddleware('admin', 'manager'), managementController.createFlow.bind(managementController));
 routes.patch('/flows/:id', roleMiddleware('admin', 'manager'), managementController.updateFlow.bind(managementController));
-routes.get('/flows/:id/workspace', roleMiddleware('admin', 'manager', 'agent', 'viewer'), managementController.getFlowWorkspace.bind(managementController));
-routes.put('/flows/:id/workspace', roleMiddleware('admin', 'manager'), managementController.saveFlowWorkspace.bind(managementController));
 
 // Admin: usuarios/agentes
 routes.get('/users', roleMiddleware('admin', 'manager'), managementController.listUsers.bind(managementController));

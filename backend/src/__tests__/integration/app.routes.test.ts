@@ -37,8 +37,6 @@ jest.mock('../../controllers/management.controller', () => ({
     listFlows: (_req: unknown, res: { json: (arg0: unknown) => void }) => res.json([]),
     createFlow: (_req: unknown, res: { status: (arg0: number) => { json: (arg0: unknown) => void } }) => res.status(201).json({ id: 1 }),
     updateFlow: (_req: unknown, res: { json: (arg0: unknown) => void }) => res.json({ id: 1 }),
-    getFlowWorkspace: (_req: unknown, res: { json: (arg0: unknown) => void }) => res.json({ workspaceModel: { nodes: [], connections: [] } }),
-    saveFlowWorkspace: (_req: unknown, res: { json: (arg0: unknown) => void }) => res.json({ workspaceModel: { nodes: [], connections: [] } }),
     listUsers: (_req: unknown, res: { json: (arg0: unknown) => void }) => res.json([]),
     createUser: (_req: unknown, res: { status: (arg0: number) => { json: (arg0: unknown) => void } }) => res.status(201).json({ id: 1 }),
     updateUser: (_req: unknown, res: { json: (arg0: unknown) => void }) => res.json({ id: 1 }),

@@ -98,9 +98,15 @@ export interface CreateFlowInput {
 
 export interface UpdateFlowInput extends CreateFlowInput {}
 
-export interface WorkflowWorkspaceModel extends Record<string, unknown> {
-  nodes: Array<Record<string, unknown>>;
-  connections: Array<Record<string, unknown>>;
+export interface CreateMessageTemplateInput {
+  name?: string;
+  content?: string;
+  category?: 'greeting' | 'closing' | 'help' | 'transfer' | 'custom';
+}
+
+export interface TransferTicketInput {
+  user_id?: number;
+  status?: TicketStatus;
 }
 
 class ManagementService {
@@ -151,30 +157,6 @@ class ManagementService {
     } catch {
       return null;
     }
-  }
-
-  private emptyWorkspaceModel(): WorkflowWorkspaceModel {
-    return {
-      nodes: [],
-      connections: [],
-    };
-  }
-
-  private normalizeWorkspaceModel(input: unknown): WorkflowWorkspaceModel {
-    if (!input || typeof input !== 'object') {
-      throw new DomainError('workspaceModel invalido', 400);
-    }
-
-    const raw = input as { nodes?: unknown; connections?: unknown };
-
-    if (!Array.isArray(raw.nodes) || !Array.isArray(raw.connections)) {
-      throw new DomainError('workspaceModel deve conter arrays nodes e connections', 400);
-    }
-
-    return {
-      nodes: raw.nodes.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>,
-      connections: raw.connections.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>,
-    };
   }
 
   private async ensureFlow(companyId: number, flowId: number): Promise<Flow> {
@@ -574,42 +556,107 @@ class ManagementService {
     return flow;
   }
 
-  async getFlowWorkspace(companyId: number, flowId: number): Promise<WorkflowWorkspaceModel> {
-    await this.ensureFlow(companyId, flowId);
-
-    const workspace = await FlowWorkspace.findOne({
-      where: {
-        company_id: companyId,
-        flow_id: flowId,
-      },
+  // ─── Métodos de Mensagens Padrão ───────────────────────────────
+  async listMessageTemplates(companyId: number): Promise<MessageTemplate[]> {
+    return MessageTemplate.findAll({
+      where: { company_id: companyId, is_active: true },
+      order: [['category', 'ASC'], ['name', 'ASC']],
     });
-
-    if (!workspace) {
-      return this.emptyWorkspaceModel();
-    }
-
-    return this.normalizeWorkspaceModel(workspace.workspace_model);
   }
 
-  async saveFlowWorkspace(companyId: number, flowId: number, workspaceModel: unknown): Promise<WorkflowWorkspaceModel> {
-    await this.ensureFlow(companyId, flowId);
-    const normalizedWorkspace = this.normalizeWorkspaceModel(workspaceModel);
+  async createMessageTemplate(companyId: number, input: CreateMessageTemplateInput): Promise<MessageTemplate> {
+    const { name, content, category } = input;
 
-    const [workspace] = await FlowWorkspace.findOrCreate({
-      where: {
-        company_id: companyId,
-        flow_id: flowId,
-      },
-      defaults: {
-        company_id: companyId,
-        flow_id: flowId,
-        workspace_model: normalizedWorkspace,
-      },
+    if (!name || !content) {
+      throw new DomainError('Nome e conteúdo são obrigatórios', 400);
+    }
+
+    const template = await MessageTemplate.create({
+      company_id: companyId,
+      name,
+      content,
+      category: category || 'custom',
+      is_active: true,
     });
 
-    await workspace.update({ workspace_model: normalizedWorkspace });
+    logger.info('Template de mensagem criado', {
+      companyId,
+      templateId: template.id,
+      category: template.category,
+    });
 
-    return this.normalizeWorkspaceModel(workspace.workspace_model);
+    return template;
+  }
+
+  async updateMessageTemplate(companyId: number, templateId: number, input: Partial<CreateMessageTemplateInput>): Promise<MessageTemplate> {
+    const template = await MessageTemplate.findOne({ where: { id: templateId, company_id: companyId } });
+    if (!template) {
+      throw new DomainError('Template não encontrado', 404);
+    }
+
+    const { name, content, category } = input;
+
+    await template.update({
+      name: name ?? template.name,
+      content: content ?? template.content,
+      category: category ?? template.category,
+    });
+
+    logger.info('Template de mensagem atualizado', {
+      companyId,
+      templateId,
+    });
+
+    return template;
+  }
+
+  async deleteMessageTemplate(companyId: number, templateId: number): Promise<void> {
+    const template = await MessageTemplate.findOne({ where: { id: templateId, company_id: companyId } });
+    if (!template) {
+      throw new DomainError('Template não encontrado', 404);
+    }
+
+    await template.destroy();
+
+    logger.info('Template de mensagem deletado', {
+      companyId,
+      templateId,
+    });
+  }
+
+  // ─── Métodos de Transferência de Tickets ───────────────────────
+  async transferTicket(companyId: number, ticketId: number, input: TransferTicketInput): Promise<Ticket> {
+    const ticket = await Ticket.findOne({ where: { id: ticketId, company_id: companyId } });
+    if (!ticket) {
+      throw new DomainError('Conversa não encontrada', 404);
+    }
+
+    const { user_id, status } = input;
+
+    // Se estiver transferindo para um usuário, validar que existe
+    if (user_id) {
+      const user = await User.findOne({ where: { id: user_id, company_id: companyId, is_active: true } });
+      if (!user) {
+        throw new DomainError('Usuário não encontrado ou inativo', 404);
+      }
+    }
+
+    const previousUserId = ticket.user_id;
+
+    await ticket.update({
+      user_id: user_id ?? ticket.user_id,
+      status: status ?? ticket.status,
+    });
+
+    logger.info('Conversa transferida', {
+      companyId,
+      ticketId,
+      fromUserId: previousUserId,
+      toUserId: user_id ?? ticket.user_id,
+      status: ticket.status,
+    });
+
+    return ticket;
   }
 }
 

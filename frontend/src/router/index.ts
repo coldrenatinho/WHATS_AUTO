@@ -35,6 +35,12 @@ const routes = [
     meta: { requiresAuth: true, roles: ['agent', 'viewer'] }
   },
   {
+    path: '/operator/queue',
+    name: 'OperatorQueue',
+    component: () => import('../views/OperatorQueue.vue'),
+    meta: { requiresAuth: true, roles: ['agent', 'viewer'] }
+  },
+  {
     path: '/instances',
     name: 'Instances',
     component: () => import('../views/Instances.vue'),
@@ -71,7 +77,7 @@ const router = createRouter({
 
 const getHomeByRole = (role?: string): string => {
   if (role === 'agent' || role === 'viewer') {
-    return '/operator/tickets'
+    return '/operator/queue'
   }
 
   return '/'
