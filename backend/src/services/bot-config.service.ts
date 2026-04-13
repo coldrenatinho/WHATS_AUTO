@@ -1,5 +1,5 @@
 import BotConfig from '../models/BotConfig';
-import Instance from '../models/Instance';
+import { Op } from 'sequelize';
 import { DomainError } from '../core/errors/domain.error';
 
 export interface BotConfigData {
@@ -34,7 +34,7 @@ class BotConfigService {
       config = await BotConfig.findOne({
         where: {
           company_id: data.company_id,
-          instance_id: null,
+          instance_id: Op.is(null),
         },
       });
     }
@@ -58,7 +58,7 @@ class BotConfigService {
     if (instanceId) {
       where.instance_id = instanceId;
     } else {
-      where.instance_id = null;
+      where.instance_id = Op.is(null);
     }
 
     return BotConfig.findOne({ where });
