@@ -51,7 +51,39 @@ Plataforma multi-tenant de atendimento WhatsApp da Norte MT Sistemas, com backen
 - O frontend possui testes unitários com Vitest, além de lint, build com Vite e validação de tipos com Vue TSC.
 - Para validação local completa do frontend, execute `npm run test`, `npm run lint` e `npm run build` dentro de `frontend/`.
 
-## 🚀 Entrega Contínua (CI/CD)
+## �️ Migrações de Banco de Dados
+
+As migrações são gerenciadas automaticamente com **Sequelize Migrations**:
+
+### Execução Automática
+- As migrações **executam automaticamente** no startup da aplicação
+- Histórico completo é rastreado na tabela `sequelizemeta`
+- Rollback seguro disponível com um único comando
+
+### Comandos Disponíveis
+```bash
+# Ver status de todas as migrações
+npm run migrate:status
+
+# Executar migrações pendentes (manual)
+npm run migrate
+
+# Reverter última migração
+npm run migrate:undo
+```
+
+### Criar Nova Migração
+```bash
+# Copiar template
+cp backend/src/migrations/TEMPLATE.ts backend/src/migrations/$(date +%Y%m%d%H%M%S)-descricao.ts
+
+# Implementar up() e down()
+# Executar: npm run dev (executa automaticamente)
+```
+
+📖 **Documentação completa**: [docs/migracao-banco-dados.md](docs/migracao-banco-dados.md)
+
+## �🚀 Entrega Contínua (CI/CD)
 
 O projeto utiliza **GitHub Actions** para automação completa:
 

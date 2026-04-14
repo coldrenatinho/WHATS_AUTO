@@ -1,5 +1,6 @@
 import { Company, Instance, User, sequelize } from '../models';
 import logger from '../utils';
+import { runMigrations } from '../migrations';
 
 interface BootstrapResult {
   companyId: number;
@@ -21,14 +22,9 @@ class BootstrapService {
     logger.info('Iniciando bootstrap do banco');
     await sequelize.authenticate();
 
-    const shouldSyncSchema = process.env.DB_SYNC_ON_STARTUP === 'true';
-
-    if (shouldSyncSchema) {
-      await sequelize.sync();
-      logger.warn('Banco autenticado e sincronizado por DB_SYNC_ON_STARTUP=true');
-    } else {
-      logger.info('Banco autenticado sem sync automatico do schema');
-    }
+    // Executar migrações de banco de dados
+    logger.info('Executando migrações pendentes...');
+    await runMigrations();
 
     const businessName = process.env.BUSINESS_NAME || 'WhatsAuto';
     const subdomain = normalizeSubdomain(process.env.COMPANY_SUBDOMAIN || 'principal') || 'principal';

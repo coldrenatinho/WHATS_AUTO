@@ -1,0 +1,6 @@
+module.exports = {
+  config: process.cwd() + '/src/config/sequelize.config.ts',
+  'models-path': process.cwd() + '/src/models',
+  'seeders-path': process.cwd() + '/src/seeders',
+  'migrations-path': process.cwd() + '/src/migrations'
+};

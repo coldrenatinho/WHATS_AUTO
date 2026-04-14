@@ -12,7 +12,10 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "typeorm": "ts-node ./node_modules/typeorm/cli.js"
+    "typeorm": "ts-node ./node_modules/typeorm/cli.js",
+    "migrate": "ts-node -P tsconfig.test.json src/migrations/cli.ts run",
+    "migrate:status": "ts-node -P tsconfig.test.json src/migrations/cli.ts status",
+    "migrate:undo": "ts-node -P tsconfig.test.json src/migrations/cli.ts undo"
   },
   "keywords": [
     "whatsapp",
