@@ -441,10 +441,10 @@ class RetailService {
   async addCustomerAddress(
     companyId: number,
     phone: string,
-    address: CustomerAddress
+    address: any
   ): Promise<void> {
     const customer = await this.getOrCreateCustomer(companyId, phone);
-    const addresses = customer.addresses as CustomerAddress[];
+    const addresses = customer.addresses as any[];
 
     if (address.is_default) {
       addresses.forEach((a) => (a.is_default = false));
@@ -558,7 +558,7 @@ class RetailService {
         is_active: true,
         starts_at: { [Op.lte]: now },
         ends_at: { [Op.gte]: now },
-        [Op.or]: [{ usage_limit: null }, { usage_count: { [Op.lt]: sequelize.col('usage_limit') } }],
+        [Op.or]: [{ usage_limit: null }, { usage_count: { [Op.lt]: 999999 } }],
       },
     });
   }

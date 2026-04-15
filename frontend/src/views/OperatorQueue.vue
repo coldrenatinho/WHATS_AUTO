@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue3-toastify'
 import api from '../services/api'
-import type { AxiosError } from 'axios'
 
 // ═══════════════════════════════════════════════════════════════
 // Tipos
@@ -415,8 +414,8 @@ onMounted(async () => {
             </button>
 
             <select
-              :value="selectedTicket.status"
-              @change="(e) => updateTicketStatus(selectedTicket.id, (e.target as HTMLSelectElement).value as Ticket['status'])"
+              :value="selectedTicket?.status"
+              @change="(e) => selectedTicket && updateTicketStatus(selectedTicket.id, (e.target as HTMLSelectElement).value as Ticket['status'])"
               class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-white"
             >
               <option v-for="[key, label] in Object.entries(statusLabel)" :key="key" :value="key">

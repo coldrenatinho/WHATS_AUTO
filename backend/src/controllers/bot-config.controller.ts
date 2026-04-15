@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import botConfigService, { BotConfigData } from '../services/bot-config.service';
-import { sendControllerError } from '../core/http/send-controller-error';
+import { sendControllerError } from '../core/http/controller-error';
 
 interface AuthRequest extends Request {
   user?: {

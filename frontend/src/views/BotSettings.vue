@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue3-toastify'
-import { useAuthStore } from '../stores/auth'
-import { api } from '../services/api'
+import api from '../services/api'
 
 interface BotConfig {
   id?: number
@@ -15,7 +14,6 @@ interface BotConfig {
   active: boolean
 }
 
-const authStore = useAuthStore()
 const loading = ref(false)
 const saving = ref(false)
 
@@ -50,13 +48,6 @@ const config = ref<BotConfig>({
 const newHolidayDate = ref('')
 const newHolidayName = ref('')
 const messageErrors = ref<Record<string, string>>({})
-
-const selectedDays = computed({
-  get: () => config.value.operating_days,
-  set: (value) => {
-    config.value.operating_days = value
-  },
-})
 
 const toggleDay = (day: number) => {
   const index = config.value.operating_days.indexOf(day)
@@ -159,14 +150,6 @@ const daysLabel = computed(() => {
     .map((d) => d.label)
     .join(', ')
 })
-
-const baseHour = (): string => {
-  return config.value.opening_hour.split(':')[0]
-}
-
-const endHour = (): string => {
-  return config.value.closing_hour.split(':')[0]
-}
 
 onMounted(() => {
   fetchBotConfig()
