@@ -112,17 +112,13 @@ services:
     depends_on:
       - backend
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.frontend-chat.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
-      - traefik.http.routers.frontend-chat.entrypoints=websecure
-      - traefik.http.routers.frontend-chat.tls=true
-      - traefik.http.routers.frontend-chat.tls.certresolver=myresolver
-      - traefik.http.services.frontend-chat.loadbalancer.server.port=80
-      - traefik.http.routers.frontend-chat.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)
-      - traefik.http.routers.frontend-chat.entrypoints=websecure
-      - traefik.http.routers.frontend-chat.tls=true
-      - traefik.http.routers.frontend-chat.tls.certresolver=myresolver
-      - traefik.http.routers.frontend-chat.service=whatsauto_frontend
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-chat.rule=Host(`chat.${ROOT_DOMAIN:-nortemtsistemas.com.br}`)"
+      - "traefik.http.routers.frontend-chat.entrypoints=websecure"
+      - "traefik.http.routers.frontend-chat.tls=true"
+      - "traefik.http.routers.frontend-chat.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-chat.service=frontend-chat"
+      - "traefik.http.services.frontend-chat.loadbalancer.server.port=80"
 
   # ─── n8n (Automação) ────────────────────────────────────────────
   # n8n:
