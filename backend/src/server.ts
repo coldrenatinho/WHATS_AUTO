@@ -1,11 +1,8 @@
 import app from './app';
 import http from 'http';
-import dotenv from 'dotenv';
 import bootstrapService from './services/bootstrap.service';
 import logger from './utils';
 import { initSocketServer } from './realtime/socket';
-
-dotenv.config();
 
 const port = process.env.PORT || 3001;
 
