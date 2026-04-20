@@ -1,4 +1,4 @@
-import { Sequelize } from 'sequelize';
+import { Sequelize, DataTypes } from 'sequelize';
 import { QueryInterface } from 'sequelize/types';
 import path from 'path';
 import fs from 'fs';
@@ -60,9 +60,12 @@ class MigrationRunner {
     try {
       console.log(`   └─ Executando: ${fileName}`);
 
-      // Importar o arquivo de migração
-      const migrationPath = path.join(__dirname, fileName);
-      const migration = await import(migrationPath);
+      // Importar o arquivo de migração (compilado para .js)
+      const migrationPath = path.join(__dirname, fileName.replace(/\.ts$/, '.js'));
+      
+      // Usar import dinâmico com cache busting
+      delete require.cache[require.resolve(migrationPath)];
+      const migration = require(migrationPath);
 
       // Executar a função up
       if (typeof migration.up === 'function') {
@@ -90,14 +93,14 @@ class MigrationRunner {
     if (!tableExists) {
       await queryInterface.createTable('sequelizemeta', {
         name: {
-          type: 'VARCHAR(255)',
+          type: DataTypes.STRING(255),
           primaryKey: true,
           allowNull: false,
         },
         executed_at: {
-          type: 'TIMESTAMP',
+          type: DataTypes.DATE,
           allowNull: false,
-          defaultValue: 'CURRENT_TIMESTAMP',
+          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
         },
       });
     }
@@ -135,7 +138,11 @@ class MigrationRunner {
       return files
         .filter(
           (file) =>
-            file.match(/^\d{14}-.*\.(ts|js)$/) && file !== 'runner.ts'
+            file.match(/^\d{14}-.*\.js$/) && 
+            !file.includes('.d.') && 
+            file !== 'runner.js' &&
+            file !== 'index.js' &&
+            file !== 'cli.js'
         )
         .sort();
     } catch (error) {
@@ -169,8 +176,9 @@ class MigrationRunner {
         return;
       }
 
-      const migrationPath = path.join(__dirname, lastMigration);
-      const migration = await import(migrationPath);
+      const migrationPath = path.join(__dirname, lastMigration.replace(/\.ts$/, '.js'));
+      delete require.cache[require.resolve(migrationPath)];
+      const migration = require(migrationPath);
 
       if (typeof migration.down === 'function') {
         await migration.down(queryInterface);

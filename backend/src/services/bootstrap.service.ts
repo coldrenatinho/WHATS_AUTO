@@ -22,9 +22,14 @@ class BootstrapService {
     logger.info('Iniciando bootstrap do banco');
     await sequelize.authenticate();
 
-    // Executar migrações de banco de dados
-    logger.info('Executando migrações pendentes...');
-    await runMigrations();
+    // Executar migrações de banco de dados (se não desabilitado)
+    const skipMigrations = process.env.SKIP_MIGRATIONS === 'true';
+    if (!skipMigrations) {
+      logger.info('Executando migrações pendentes...');
+      await runMigrations();
+    } else {
+      logger.warn('⚠️  Migrações desabilitadas por SKIP_MIGRATIONS=true');
+    }
 
     const businessName = process.env.BUSINESS_NAME || 'WhatsAuto';
     const subdomain = normalizeSubdomain(process.env.COMPANY_SUBDOMAIN || 'principal') || 'principal';

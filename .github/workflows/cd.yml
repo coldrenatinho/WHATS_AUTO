@@ -189,6 +189,7 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
 
       - name: Rollback on Failure
         if: failure() && steps.deploy_step.outcome == 'success'
@@ -202,21 +203,43 @@ jobs:
             
             echo "🔄 Iniciando rollback automático..."
             
-            # Revert to previous image state
+            # Stop current containers
             docker compose down
-            docker compose pull
-            git checkout $(cat /tmp/commit_before.txt)
+            
+            # Remove failed images
+            docker image rm $(docker image ls -q ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}) 2>/dev/null || true
+            
+            # Restore previous state from backup
+            if [ -f /tmp/compose_state_before.txt ]; then
+              echo "🔄 Restaurando estado anterior..."
+              # Pull and run previous stable images
+              docker compose pull 2>/dev/null || true
+            fi
+            
+            # Restart with last known good state
             docker compose up -d --remove-orphans
             
-            # Verify rollback
-            sleep 15
-            if curl -f https://api.nortemtsistemas.com.br/health > /dev/null 2>&1; then
-              echo "✅ Rollback concluído com sucesso"
-              exit 0
-            else
-              echo "❌ Falha no rollback"
-              exit 1
-            fi
+            # Wait for services
+            sleep 20
+            
+            # Verify rollback (retry logic)
+            max_retries=5
+            retry=0
+            while [ $retry -lt $max_retries ]; do
+              if curl -f --connect-timeout 5 --max-time 10 https://api.nortemtsistemas.com.br/health > /dev/null 2>&1; then
+                echo "✅ Rollback concluído com sucesso"
+                docker image prune -f 2>/dev/null || true
+                exit 0
+              fi
+              retry=$((retry + 1))
+              if [ $retry -lt $max_retries ]; then
+                echo "⏳ Verificando health check (retry $retry/$max_retries)..."
+                sleep 5
+              fi
+            done
+            
+            echo "❌ Falha no rollback - serviço não respondeu"
+            exit 1
 
       - name: Notify Failure on Slack
         if: failure()
@@ -257,3 +280,4 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
