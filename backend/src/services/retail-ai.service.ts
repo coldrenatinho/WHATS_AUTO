@@ -43,6 +43,14 @@ interface AIResponse {
   };
 }
 
+interface GeminiChatResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
 class RetailAIService {
   private geminiApiKey: string;
   private geminiUrl: string;
@@ -208,8 +216,8 @@ Cliente: "Quero falar com alguém"
       throw new Error(`Gemini API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.choices[0].message.content;
+    const data = (await response.json()) as GeminiChatResponse;
+    return data.choices?.[0]?.message?.content ?? '';
   }
 
   private parseAIResponse(rawResponse: string): AIResponse {

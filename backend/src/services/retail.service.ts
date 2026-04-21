@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Cart, Order, Product, Category, RetailCustomer, LoyaltyTransaction, Promotion, CartItem } from '../models/retail.models';
+import { Cart, Order, Product, Category, RetailCustomer, LoyaltyTransaction, Promotion, CartItem, CustomerAddress } from '../models/retail.models';
 import { Instance, Ticket, Message } from '../models';
 import logger from '../utils';
 
@@ -266,7 +266,7 @@ class RetailService {
     const instance = await Instance.findOne({ where: { company_id: companyId } });
     if (!instance) return 0;
 
-    const metadata = (instance.metadata || {}) as Record<string, unknown>;
+    const metadata = (instance.settings || {}) as Record<string, unknown>;
     const deliveryFee = Number(metadata.delivery_fee || 0);
     const freeDeliveryMin = Number(metadata.free_delivery_min || 0);
 
