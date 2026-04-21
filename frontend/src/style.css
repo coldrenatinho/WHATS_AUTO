@@ -121,6 +121,29 @@ h6 {
   transform: translateY(8px);
 }
 
+.ui-modal-fade-enter-active,
+.ui-modal-fade-leave-active {
+  transition: opacity 220ms ease;
+}
+
+.ui-modal-fade-enter-from,
+.ui-modal-fade-leave-to {
+  opacity: 0;
+}
+
+.ui-modal-scale-enter-active,
+.ui-modal-scale-leave-active {
+  transition:
+    transform 220ms ease,
+    opacity 220ms ease;
+}
+
+.ui-modal-scale-enter-from,
+.ui-modal-scale-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+}
+
 @media (max-width: 1024px) {
   body {
     background:

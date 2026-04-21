@@ -30,7 +30,7 @@ class BotConfigController {
       const config = await botConfigService.upsertBotConfig(data);
       res.status(200).json(config);
     } catch (error) {
-      sendControllerError(res, error);
+      sendControllerError(res, error, 'Erro ao salvar configuracao do bot');
     }
   }
 
@@ -56,7 +56,7 @@ class BotConfigController {
 
       res.status(200).json(config);
     } catch (error) {
-      sendControllerError(res, error);
+      sendControllerError(res, error, 'Erro ao buscar configuracao do bot');
     }
   }
 
@@ -75,7 +75,7 @@ class BotConfigController {
       const configs = await botConfigService.getBotConfigsByCompany(companyId);
       res.status(200).json(configs);
     } catch (error) {
-      sendControllerError(res, error);
+      sendControllerError(res, error, 'Erro ao listar configuracoes do bot');
     }
   }
 
@@ -101,7 +101,7 @@ class BotConfigController {
 
       res.status(200).json(config);
     } catch (error) {
-      sendControllerError(res, error);
+      sendControllerError(res, error, 'Erro ao buscar configuracao por id');
     }
   }
 
@@ -121,7 +121,7 @@ class BotConfigController {
       const isOpen = await botConfigService.isWithinBusinessHours(companyId, instanceId);
       res.status(200).json({ is_open: isOpen });
     } catch (error) {
-      sendControllerError(res, error);
+      sendControllerError(res, error, 'Erro ao verificar horario de atendimento');
     }
   }
 
@@ -141,7 +141,7 @@ class BotConfigController {
       const message = await botConfigService.getWelcomeMessage(companyId, instanceId);
       res.status(200).json({ welcome_message: message });
     } catch (error) {
-      sendControllerError(res, error);
+      sendControllerError(res, error, 'Erro ao buscar mensagem de boas-vindas');
     }
   }
 
@@ -161,7 +161,7 @@ class BotConfigController {
       const messages = await botConfigService.getStandardMessages(companyId, instanceId);
       res.status(200).json(messages);
     } catch (error) {
-      sendControllerError(res, error);
+      sendControllerError(res, error, 'Erro ao buscar mensagens padrao');
     }
   }
 
@@ -181,7 +181,7 @@ class BotConfigController {
       await botConfigService.deleteBotConfig(Number(id), companyId);
       res.status(204).send();
     } catch (error) {
-      sendControllerError(res, error);
+      sendControllerError(res, error, 'Erro ao deletar configuracao do bot');
     }
   }
 }

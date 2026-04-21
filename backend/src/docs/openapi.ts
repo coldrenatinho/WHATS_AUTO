@@ -18,6 +18,8 @@ const openApiSpec = {
     { name: 'Users', description: 'Gestao de usuarios internos' },
     { name: 'Instances', description: 'Instancias de WhatsApp' },
     { name: 'Tickets', description: 'Atendimento e conversas' },
+    { name: 'Messages', description: 'Mensagens vinculadas a conversas' },
+    { name: 'Webhooks', description: 'Endpoints de entrada para provedores externos' },
     { name: 'Flows', description: 'Fluxos de automacao e roteamento' },
     { name: 'Revolution', description: 'Mock da Revolution API' },
   ],
@@ -188,6 +190,54 @@ const openApiSpec = {
           priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'] },
           channel: { type: 'string', enum: ['whatsapp', 'telegram', 'messenger'] },
           tags: { type: 'array', items: { type: 'string' }, nullable: true },
+        },
+      },
+      MessagePayload: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1001 },
+          company_id: { type: 'integer', example: 1 },
+          ticket_id: { type: 'integer', example: 42 },
+          instance_id: { type: 'integer', example: 3 },
+          message_id: { type: 'string', nullable: true, example: 'msg_1712233445566' },
+          direction: { type: 'string', enum: ['inbound', 'outbound'], example: 'inbound' },
+          type: {
+            type: 'string',
+            enum: ['text', 'image', 'video', 'audio', 'document', 'sticker', 'location', 'contact'],
+            example: 'text',
+          },
+          content: { type: 'string', nullable: true, example: 'Ola, preciso de atendimento' },
+          metadata: { type: 'object', additionalProperties: true, nullable: true },
+          status: { type: 'string', enum: ['sent', 'delivered', 'read', 'failed'], example: 'delivered' },
+          sent_at: { type: 'string', format: 'date-time', nullable: true },
+          created_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      SendTextToTicketRequest: {
+        type: 'object',
+        required: ['text'],
+        properties: {
+          text: { type: 'string', minLength: 1, maxLength: 4096, example: 'Perfeito, vou te ajudar agora.' },
+        },
+      },
+      SendTextToTicketResponse: {
+        type: 'object',
+        properties: {
+          message: { $ref: '#/components/schemas/MessagePayload' },
+          provider: { type: 'object', additionalProperties: true },
+        },
+      },
+      WebhookInboundResponse: {
+        type: 'object',
+        properties: {
+          received: { type: 'boolean', example: true },
+          processed: { type: 'boolean', example: true },
+          dispatched: { type: 'boolean', example: true },
+          typebotDispatched: { type: 'boolean', example: false },
+          typebotFallbackReason: { type: 'string', nullable: true, example: 'typebot_http_404' },
+          ticketId: { type: 'integer', nullable: true, example: 42 },
+          messageId: { type: 'integer', nullable: true, example: 1001 },
+          reason: { type: 'string', nullable: true, example: 'instance_not_found' },
         },
       },
       CreateTicketRequest: {
@@ -664,6 +714,145 @@ const openApiSpec = {
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/TicketPayload' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/messages/tickets/{ticketId}': {
+      get: {
+        tags: ['Messages'],
+        summary: 'Lista mensagens da conversa por ticket',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: 'path', name: 'ticketId', required: true, schema: { type: 'integer' } },
+          {
+            in: 'query',
+            name: 'limit',
+            required: false,
+            schema: { type: 'integer', minimum: 1, maximum: 500, default: 200 },
+            description: 'Quantidade maxima de mensagens retornadas',
+          },
+          {
+            in: 'query',
+            name: 'offset',
+            required: false,
+            schema: { type: 'integer', minimum: 0, default: 0 },
+            description: 'Deslocamento para paginação',
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Mensagens retornadas com sucesso',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/MessagePayload' },
+                },
+              },
+            },
+          },
+          '400': {
+            description: 'Dados invalidos',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '404': {
+            description: 'Conversa nao encontrada',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/messages/tickets/{ticketId}/text': {
+      post: {
+        tags: ['Messages'],
+        summary: 'Envia mensagem de texto para a conversa',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'ticketId', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/SendTextToTicketRequest' },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Mensagem enviada com sucesso',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SendTextToTicketResponse' },
+              },
+            },
+          },
+          '400': {
+            description: 'Dados invalidos',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '404': {
+            description: 'Conversa ou instancia nao encontrada',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/webhooks/evolution': {
+      post: {
+        tags: ['Webhooks'],
+        summary: 'Recebe eventos inbound da Evolution API',
+        description: 'Endpoint usado por provedores externos para entregar mensagens inbound no fluxo de chatbot.',
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                additionalProperties: true,
+              },
+            },
+          },
+        },
+        responses: {
+          '202': {
+            description: 'Webhook recebido e processado/ignorado',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/WebhookInboundResponse' },
+              },
+            },
+          },
+          '401': {
+            description: 'Webhook sem autenticacao valida',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '500': {
+            description: 'Erro ao processar webhook',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
               },
             },
           },

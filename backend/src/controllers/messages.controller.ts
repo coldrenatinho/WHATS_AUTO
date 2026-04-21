@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares';
 import ConversationMessageApplication from '../application/chatbot/conversation-message.application';
 import RevolutionMessageProvider from '../application/chatbot/providers/revolution-message.provider';
-import DomainError from '../core/errors/domain.error';
+import sendControllerError from '../core/http/controller-error';
 import logger from '../utils';
 
 class MessagesController {
@@ -27,13 +27,7 @@ class MessagesController {
 
       res.json(messages);
     } catch (error) {
-      if (error instanceof DomainError) {
-        res.status(error.statusCode).json({ error: error.message });
-        return;
-      }
-
-      const message = error instanceof Error ? error.message : 'Erro ao listar mensagens';
-      res.status(500).json({ error: message });
+      sendControllerError(res, error, 'Erro ao listar mensagens');
     }
   }
 
@@ -61,14 +55,8 @@ class MessagesController {
         provider: result.provider,
       });
     } catch (error) {
-      if (error instanceof DomainError) {
-        res.status(error.statusCode).json({ error: error.message });
-        return;
-      }
-
       logger.error('Falha ao enviar mensagem para conversa', error);
-      const message = error instanceof Error ? error.message : 'Erro ao enviar mensagem';
-      res.status(502).json({ error: message });
+      sendControllerError(res, error, 'Erro ao enviar mensagem', 502);
     }
   }
 }

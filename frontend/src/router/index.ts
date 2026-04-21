@@ -29,12 +29,6 @@ const routes = [
     meta: { requiresAuth: true, roles: ['admin', 'manager'] }
   },
   {
-    path: '/operator/tickets',
-    name: 'OperatorTickets',
-    component: () => import('../views/OperatorTickets.vue'),
-    meta: { requiresAuth: true, roles: ['agent', 'viewer'] }
-  },
-  {
     path: '/operator/queue',
     name: 'OperatorQueue',
     component: () => import('../views/OperatorQueue.vue'),
@@ -50,12 +44,6 @@ const routes = [
     path: '/settings',
     name: 'Settings',
     component: () => import('../views/Settings.vue'),
-    meta: { requiresAuth: true, roles: ['admin', 'manager'] }
-  },
-  {
-    path: '/bot-settings',
-    name: 'BotSettings',
-    component: () => import('../views/BotSettings.vue'),
     meta: { requiresAuth: true, roles: ['admin', 'manager'] }
   },
   {

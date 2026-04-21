@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import DomainError from '../core/errors/domain.error';
+import sendControllerError from '../core/http/controller-error';
 import authService from '../services';
 import { AuthRequest } from '../middlewares';
 
@@ -29,8 +31,7 @@ class AuthController {
       const parsed = loginSchema.safeParse(req.body);
 
       if (!parsed.success) {
-        res.status(400).json({ error: parsed.error.issues[0]?.message || 'Payload de login invalido' });
-        return;
+        throw new DomainError(parsed.error.issues[0]?.message || 'Payload de login invalido', 400);
       }
 
       const { email, password } = parsed.data;
@@ -38,8 +39,7 @@ class AuthController {
       const result = await authService.login({ email, password });
       res.json(result);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro no login';
-      res.status(401).json({ error: message });
+      sendControllerError(res, error, 'Erro no login', 401);
     }
   }
 
@@ -48,16 +48,14 @@ class AuthController {
       const parsed = registerSchema.safeParse(req.body);
 
       if (!parsed.success) {
-        res.status(400).json({ error: parsed.error.issues[0]?.message || 'Payload de cadastro invalido' });
-        return;
+        throw new DomainError(parsed.error.issues[0]?.message || 'Payload de cadastro invalido', 400);
       }
 
       const { name, email, password, companyName, subdomain, phone } = parsed.data;
       const normalizedSubdomain = normalizeSubdomain(subdomain);
 
       if (!normalizedSubdomain) {
-        res.status(400).json({ error: 'Subdominio invalido' });
-        return;
+        throw new DomainError('Subdominio invalido', 400);
       }
 
       const result = await authService.register({
@@ -71,8 +69,7 @@ class AuthController {
 
       res.status(201).json(result);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro no registro';
-      res.status(400).json({ error: message });
+      sendControllerError(res, error, 'Erro no registro', 400);
     }
   }
 
@@ -89,7 +86,7 @@ class AuthController {
         company: req.company,
       });
     } catch (error) {
-      res.status(500).json({ error: 'Erro ao buscar dados do usuário' });
+      sendControllerError(res, error, 'Erro ao buscar dados do usuario');
     }
   }
 }

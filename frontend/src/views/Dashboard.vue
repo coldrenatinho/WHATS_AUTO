@@ -3,6 +3,7 @@ import { computed, ref, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import api from '../services/api'
 import { sendPing, useSocketState } from '../services/socket'
+import { UiCard, UiSectionHeader } from '../components/ui'
 
 const stats = ref({
   totalTickets: 0,
@@ -53,10 +54,7 @@ onMounted(async () => {
   <div class="space-y-6">
     <!-- Page Header -->
     <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-      <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p class="text-gray-600 dark:text-gray-400">Visao geral da operacao do seu chatbot</p>
-      </div>
+      <UiSectionHeader title="Dashboard" subtitle="Visao geral da operacao do seu chatbot" />
       <div class="flex flex-wrap items-center gap-2">
         <div class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-700/40 dark:bg-emerald-500/10 dark:text-emerald-300">
           <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -77,33 +75,33 @@ onMounted(async () => {
     </div>
 
     <div class="grid gap-3 md:grid-cols-3">
-      <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+      <UiCard>
         <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Realtime</p>
         <p class="mt-2 font-semibold">{{ lastServerMessage || 'Aguardando evento de boas-vindas...' }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+      </UiCard>
+      <UiCard>
         <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Heartbeat</p>
         <p class="mt-2 font-semibold">{{ lastPongAt ? `Ultimo pong em ${dayjs(lastPongAt).format('DD/MM/YYYY HH:mm:ss')}` : 'Sem pong recebido ainda' }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+      </UiCard>
+      <UiCard>
         <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Falhas</p>
         <p class="mt-2 font-semibold">{{ lastError || 'Nenhum erro de conexao' }}</p>
-      </div>
+      </UiCard>
     </div>
 
     <div class="grid gap-3 md:grid-cols-3">
-      <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+      <UiCard>
         <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Eventos de Ticket</p>
         <p class="mt-2 text-lg font-semibold">{{ ticketEventsCount }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+      </UiCard>
+      <UiCard>
         <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Eventos de Mensagem</p>
         <p class="mt-2 text-lg font-semibold">{{ messageEventsCount }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+      </UiCard>
+      <UiCard>
         <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Ultimo Evento</p>
         <p class="mt-2 font-semibold">{{ lastRealtimeEvent || 'Sem eventos ainda' }}</p>
-      </div>
+      </UiCard>
     </div>
 
     <div v-if="loading" class="rounded-xl border border-gray-200 bg-white p-5 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">

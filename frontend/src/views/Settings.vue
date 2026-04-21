@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue3-toastify'
 import { useAuthStore } from '../stores/auth'
+import { UiCard, UiSectionHeader } from '../components/ui'
 
 const authStore = useAuthStore()
 
@@ -51,10 +52,7 @@ const saveSettings = () => {
 <template>
   <div class="space-y-6">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Configurações</h1>
-        <p class="mt-2 text-gray-600 dark:text-gray-400">Ajustes da sua operacao e preferências da equipe.</p>
-      </div>
+      <UiSectionHeader title="Configuracoes" subtitle="Ajustes da sua operacao e preferencias da equipe." compact />
 
       <div class="text-sm text-gray-500 dark:text-gray-400">
         {{ activeToggles }} de {{ toggles.length }} automações ativas
@@ -62,7 +60,7 @@ const saveSettings = () => {
     </div>
     
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+      <UiCard>
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Conta</h2>
         <div class="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-400">
           <p><span class="font-semibold text-gray-900 dark:text-gray-100">Empresa:</span> {{ authStore.company?.name || 'Nao informado' }}</p>
@@ -70,9 +68,9 @@ const saveSettings = () => {
           <p><span class="font-semibold text-gray-900 dark:text-gray-100">Subdominio:</span> {{ authStore.company?.subdomain || 'Nao informado' }}</p>
           <p v-if="lastSavedAt"><span class="font-semibold text-gray-900 dark:text-gray-100">Último ajuste:</span> {{ lastSavedAt }}</p>
         </div>
-      </div>
+      </UiCard>
 
-      <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+      <UiCard>
         <div class="flex items-center justify-between gap-3">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Automacoes</h2>
           <button
@@ -96,7 +94,7 @@ const saveSettings = () => {
             </button>
           </label>
         </div>
-      </div>
+      </UiCard>
     </div>
   </div>
 </template>

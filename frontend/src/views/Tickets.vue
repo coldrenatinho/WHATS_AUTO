@@ -5,6 +5,7 @@ import { toast } from 'vue3-toastify'
 import api from '../services/api'
 import type { AxiosError } from 'axios'
 import { useAuthStore } from '../stores/auth'
+import { UiCard, UiModal, UiSectionHeader } from '../components/ui'
 
 interface Ticket {
   id: number
@@ -34,6 +35,7 @@ const loading = ref(true)
 const searchQuery = ref('')
 const updatingTicketId = ref<number | null>(null)
 const creatingTicket = ref(false)
+const isNewChatModalOpen = ref(false)
 const instances = ref<InstanceOption[]>([])
 const authStore = useAuthStore()
 const expandedTicketId = ref<number | null>(null)
@@ -238,6 +240,8 @@ const createChat = async () => {
       firstMessage: '',
     }
 
+    isNewChatModalOpen.value = false
+
     await loadTickets()
   } catch (error) {
     const requestError = error as AxiosError<{ error?: string }>
@@ -276,82 +280,49 @@ const handleStatusChange = (ticketId: number, event: Event) => {
 onMounted(async () => {
   await Promise.all([loadTickets(), loadInstances()])
 })
+
+const openNewChatModal = () => {
+  isNewChatModalOpen.value = true
+}
+
+const closeNewChatModal = () => {
+  isNewChatModalOpen.value = false
+}
 </script>
 
 <template>
   <div class="space-y-5">
     <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Conversas</h1>
-        <p class="mt-2 text-gray-600 dark:text-gray-400">Acompanhe sua fila em tempo real e priorize atendimentos.</p>
-      </div>
+      <UiSectionHeader title="Conversas" subtitle="Acompanhe sua fila em tempo real e priorize atendimentos." />
 
-      <label class="relative block w-full lg:w-96">
-        <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </span>
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Buscar por nome, telefone, instância ou status"
-          class="w-full rounded-xl border border-gray-300 bg-white py-3 pl-9 pr-4 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
-        />
-      </label>
-    </div>
+      <div class="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center">
+        <label class="relative block w-full lg:w-96">
+          <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Buscar por nome, telefone, instância ou status"
+            class="w-full rounded-xl border border-gray-300 bg-white py-3 pl-9 pr-4 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+          />
+        </label>
 
-    <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Iniciar novo chat</h2>
-      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Crie uma conversa manual e envie a primeira mensagem (opcional).</p>
-
-      <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <select
-          v-model="newChatForm.instanceId"
-          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
-        >
-          <option value="" disabled>Selecione a instância</option>
-          <option v-for="instance in instances" :key="instance.id" :value="String(instance.id)">
-            {{ instance.name }}
-          </option>
-        </select>
-
-        <input
-          v-model="newChatForm.contactPhone"
-          type="text"
-          placeholder="Telefone do contato (com DDI)"
-          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
-        />
-
-        <input
-          v-model="newChatForm.contactName"
-          type="text"
-          placeholder="Nome do contato (opcional)"
-          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
-        />
-
-        <input
-          v-model="newChatForm.firstMessage"
-          type="text"
-          placeholder="Primeira mensagem (opcional)"
-          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
-        />
-      </div>
-
-      <div class="mt-4">
         <button
-          class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-          :disabled="creatingTicket"
-          @click="createChat"
+          type="button"
+          class="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+          @click="openNewChatModal"
         >
-          {{ creatingTicket ? 'Iniciando...' : 'Iniciar conversa' }}
+          Novo chat
         </button>
       </div>
     </div>
-    
-    <div v-if="loading" class="rounded-xl border border-gray-200 bg-white p-4 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+
+    <UiCard v-if="loading" class="text-gray-600 dark:text-gray-300">
       Carregando conversas...
-    </div>
+    </UiCard>
 
     <div v-else class="grid grid-cols-1 gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
       <div v-if="filteredTickets.length === 0" class="rounded-lg border border-dashed border-gray-300 p-5 text-gray-600 dark:border-gray-600 dark:text-gray-300">
@@ -443,5 +414,64 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <UiModal
+      :open="isNewChatModalOpen"
+      title="Iniciar novo chat"
+      description="Crie uma conversa manual e envie a primeira mensagem (opcional)."
+      size="md"
+      @close="closeNewChatModal"
+    >
+      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <select
+          v-model="newChatForm.instanceId"
+          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+        >
+          <option value="" disabled>Selecione a instância</option>
+          <option v-for="instance in instances" :key="instance.id" :value="String(instance.id)">
+            {{ instance.name }}
+          </option>
+        </select>
+
+        <input
+          v-model="newChatForm.contactPhone"
+          type="text"
+          placeholder="Telefone do contato (com DDI)"
+          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+        />
+
+        <input
+          v-model="newChatForm.contactName"
+          type="text"
+          placeholder="Nome do contato (opcional)"
+          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+        />
+
+        <input
+          v-model="newChatForm.firstMessage"
+          type="text"
+          placeholder="Primeira mensagem (opcional)"
+          class="rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:ring-emerald-900/30"
+        />
+      </div>
+
+      <template #footer>
+        <button
+          type="button"
+          class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          @click="closeNewChatModal"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+          :disabled="creatingTicket"
+          @click="createChat"
+        >
+          {{ creatingTicket ? 'Iniciando...' : 'Iniciar conversa' }}
+        </button>
+      </template>
+    </UiModal>
   </div>
 </template>
