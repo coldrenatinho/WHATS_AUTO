@@ -20,7 +20,6 @@ const helpDialog = ref(false)
 const isAuthRoute = computed(() => route.path === '/login')
 const isMobile = computed(() => display.mdAndDown.value)
 const userName = computed(() => authStore.user?.name || 'Usuario')
-const userRole = computed(() => authStore.user?.role || 'Perfil')
 
 const navItems = computed(() => {
   const role = authStore.user?.role || ''
@@ -123,7 +122,7 @@ const handleLogout = () => {
           elevation="2"
           rounded="xl"
         >
-          <v-list-item class="py-3" prepend-avatar="/favicon.ico" title="Norte MT" subtitle="Control Center" />
+          <v-list-item class="py-3" prepend-avatar="/favicon.svg" title="Norte MT" subtitle="Control Center" />
 
           <v-divider class="my-2" />
 
