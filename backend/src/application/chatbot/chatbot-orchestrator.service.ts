@@ -1,10 +1,24 @@
-import { Op } from 'sequelize';
 import { Flow, Instance, Message, Ticket } from '../../models';
+import { Transaction } from 'sequelize';
 import { emitMessageCreated, emitTicketCreated, emitTicketUpdated } from '../../realtime/events';
 import logger from '../../utils';
 import { ParsedInbound } from './contracts';
+import {
+  FlowRepository,
+  InstanceRepository,
+  MessageRepository,
+  TicketRepository,
+} from './persistence/repositories';
+import { UnitOfWork } from './persistence/unit-of-work';
 import N8nDispatcherStrategy from './strategies/n8n-dispatcher.strategy';
 import TypebotDispatcherStrategy from './strategies/typebot-dispatcher.strategy';
+import {
+  SequelizeFlowRepository,
+  SequelizeInstanceRepository,
+  SequelizeMessageRepository,
+  SequelizeTicketRepository,
+} from '../../infrastructure/persistence/sequelize/sequelize-chatbot.repositories';
+import SequelizeUnitOfWork from '../../infrastructure/persistence/sequelize/sequelize-unit-of-work';
 
 export type InboundProcessingResult = {
   received: boolean;
@@ -18,59 +32,66 @@ export type InboundProcessingResult = {
 };
 
 export default class ChatbotOrchestratorService {
+  constructor(
+    private readonly instanceRepository: InstanceRepository = new SequelizeInstanceRepository(),
+    private readonly ticketRepository: TicketRepository = new SequelizeTicketRepository(),
+    private readonly messageRepository: MessageRepository = new SequelizeMessageRepository(),
+    private readonly flowRepository: FlowRepository = new SequelizeFlowRepository(),
+    private readonly unitOfWork: UnitOfWork = new SequelizeUnitOfWork()
+  ) {}
+
   private readonly typebotStrategy = new TypebotDispatcherStrategy();
 
   private readonly n8nStrategy = new N8nDispatcherStrategy();
 
-  private async findOrCreateTicket(instance: Instance, parsed: ParsedInbound): Promise<{ ticket: Ticket; wasNew: boolean }> {
-    const openTicket = await Ticket.findOne({
-      where: {
-        company_id: instance.company_id,
-        instance_id: instance.id,
-        contact_phone: parsed.phone,
-        status: { [Op.notIn]: ['resolved', 'closed'] },
-      },
-      order: [['updated_at', 'DESC']],
-    });
+  private async findOrCreateTicket(instance: Instance, parsed: ParsedInbound, tx: Transaction): Promise<{ ticket: Ticket; wasNew: boolean }> {
+    const openTicket = await this.ticketRepository.findLatestOpenByContact(
+      instance.company_id,
+      instance.id,
+      parsed.phone,
+      tx
+    );
 
     if (openTicket) {
       return { ticket: openTicket, wasNew: false };
     }
 
-    const created = await Ticket.create({
-      company_id: instance.company_id,
-      instance_id: instance.id,
-      contact_phone: parsed.phone,
-      contact_name: parsed.pushName,
-      status: 'open',
-      priority: 'medium',
-      channel: 'whatsapp',
-      last_message_at: new Date(),
-    });
+    const created = await this.ticketRepository.createInboundTicket(
+      {
+        companyId: instance.company_id,
+        instanceId: instance.id,
+        contactPhone: parsed.phone,
+        contactName: parsed.pushName,
+      },
+      tx
+    );
 
     return { ticket: created, wasNew: true };
   }
 
-  private async persistInboundMessage(instance: Instance, ticket: Ticket, parsed: ParsedInbound, rawPayload: Record<string, unknown>): Promise<Message> {
-    return Message.create({
-      company_id: instance.company_id,
-      ticket_id: ticket.id,
-      instance_id: instance.id,
-      message_id: parsed.externalMessageId,
-      direction: 'inbound',
-      type: 'text',
-      content: parsed.text,
-      metadata: {
+  private async persistInboundMessage(
+    instance: Instance,
+    ticket: Ticket,
+    parsed: ParsedInbound,
+    rawPayload: Record<string, unknown>,
+    tx: Transaction
+  ): Promise<Message> {
+    return this.messageRepository.createInbound(
+      {
+        companyId: instance.company_id,
+        ticketId: ticket.id,
+        instanceId: instance.id,
+        messageId: parsed.externalMessageId,
+        content: parsed.text,
         remoteJid: parsed.remoteJid,
         rawPayload,
       },
-      status: 'delivered',
-      sent_at: new Date(),
-    });
+      tx
+    );
   }
 
   async processInbound(parsed: ParsedInbound, rawPayload: Record<string, unknown>): Promise<InboundProcessingResult> {
-    const instance = await Instance.findOne({ where: { evolution_instance: parsed.instanceName } });
+    const instance = await this.instanceRepository.findByEvolutionInstance(parsed.instanceName);
 
     if (!instance) {
       logger.warn('Webhook inbound ignorado: instancia nao encontrada', {
@@ -84,29 +105,25 @@ export default class ChatbotOrchestratorService {
       };
     }
 
-    const { ticket, wasNew } = await this.findOrCreateTicket(instance, parsed);
+    const persistenceResult = await this.unitOfWork.runInTransaction(async ({ tx }) => {
+      const { ticket, wasNew } = await this.findOrCreateTicket(instance, parsed, tx);
+      await this.ticketRepository.touchLastMessage(ticket, parsed.pushName, tx);
+      const inboundMessage = await this.persistInboundMessage(instance, ticket, parsed, rawPayload, tx);
 
-    if (wasNew) {
-      emitTicketCreated(ticket);
+      return {
+        ticket,
+        wasNew,
+        inboundMessage,
+      };
+    });
+
+    if (persistenceResult.wasNew) {
+      emitTicketCreated(persistenceResult.ticket);
     }
+    emitTicketUpdated(persistenceResult.ticket);
+    emitMessageCreated(persistenceResult.inboundMessage);
 
-    await ticket.update({
-      contact_name: ticket.contact_name || parsed.pushName,
-      last_message_at: new Date(),
-    });
-    emitTicketUpdated(ticket);
-
-    const inboundMessage = await this.persistInboundMessage(instance, ticket, parsed, rawPayload);
-    emitMessageCreated(inboundMessage);
-
-    const flows = await Flow.findAll({
-      where: {
-        company_id: instance.company_id,
-        is_active: true,
-        trigger_type: 'webhook',
-      },
-      order: [['updated_at', 'DESC']],
-    });
+    const flows: Flow[] = await this.flowRepository.listActiveWebhookFlows(instance.company_id);
 
     const typebotFlow = flows.find((flow) => this.typebotStrategy.canHandle(flow));
     const fallbackFlow = flows.find((flow) => !this.typebotStrategy.canHandle(flow));
@@ -118,28 +135,25 @@ export default class ChatbotOrchestratorService {
       const typebotResult = await this.typebotStrategy.dispatch({
         flow: typebotFlow,
         instance,
-        ticket,
+        ticket: persistenceResult.ticket,
         parsed,
         rawPayload,
-        messageId: inboundMessage.id,
+        messageId: persistenceResult.inboundMessage.id,
       });
 
       typebotDispatched = typebotResult.delivered;
       typebotFallbackReason = typebotResult.reason || null;
 
       if (typebotResult.sessionId) {
-        const currentMetadata = (ticket.metadata || {}) as Record<string, unknown>;
-        await ticket.update({
-          metadata: {
-            ...currentMetadata,
-            typebot: {
-              flowId: typebotFlow.id,
-              sessionId: typebotResult.sessionId,
-              lastDispatchedAt: new Date().toISOString(),
-            },
-          },
+        await this.unitOfWork.runInTransaction(async ({ tx }) => {
+          await this.ticketRepository.updateTypebotSession(
+            persistenceResult.ticket,
+            typebotFlow.id,
+            typebotResult.sessionId,
+            tx
+          );
         });
-        emitTicketUpdated(ticket);
+        emitTicketUpdated(persistenceResult.ticket);
       }
     }
 
@@ -149,10 +163,10 @@ export default class ChatbotOrchestratorService {
           flow: fallbackFlow,
           typebotFlowId: typebotFlow?.id,
           instance,
-          ticket,
+          ticket: persistenceResult.ticket,
           parsed,
           rawPayload,
-          messageId: inboundMessage.id,
+          messageId: persistenceResult.inboundMessage.id,
           typebotFallbackReason,
         })
       : { delivered: false };
@@ -163,8 +177,8 @@ export default class ChatbotOrchestratorService {
       dispatched: n8nResult.delivered,
       typebotDispatched,
       typebotFallbackReason,
-      ticketId: ticket.id,
-      messageId: inboundMessage.id,
+      ticketId: persistenceResult.ticket.id,
+      messageId: persistenceResult.inboundMessage.id,
     };
   }
 }

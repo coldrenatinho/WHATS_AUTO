@@ -18,7 +18,12 @@ class MessagesController {
         return;
       }
 
-      const messages = await this.conversationMessageApplication.listTicketMessages(companyId, ticketId);
+      const rawLimit = Number(req.query.limit);
+      const rawOffset = Number(req.query.offset);
+      const limit = Number.isNaN(rawLimit) ? 200 : rawLimit;
+      const offset = Number.isNaN(rawOffset) ? 0 : rawOffset;
+
+      const messages = await this.conversationMessageApplication.listTicketMessages(companyId, ticketId, limit, offset);
 
       res.json(messages);
     } catch (error) {

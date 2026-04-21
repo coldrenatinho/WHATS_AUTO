@@ -1,21 +1,42 @@
 import DomainError from '../../core/errors/domain.error';
-import { Instance, Message, Ticket } from '../../models';
+import { Message } from '../../models';
 import { emitMessageCreated, emitTicketUpdated } from '../../realtime/events';
 import { MessageProviderPort } from './providers/message-provider.port';
+import {
+  InstanceRepository,
+  MessageRepository,
+  TicketRepository,
+} from './persistence/repositories';
+import { UnitOfWork } from './persistence/unit-of-work';
+import {
+  SequelizeInstanceRepository,
+  SequelizeMessageRepository,
+  SequelizeTicketRepository,
+} from '../../infrastructure/persistence/sequelize/sequelize-chatbot.repositories';
+import SequelizeUnitOfWork from '../../infrastructure/persistence/sequelize/sequelize-unit-of-work';
 
 export default class ConversationMessageApplication {
-  constructor(private readonly messageProvider: MessageProviderPort) {}
+  constructor(
+    private readonly messageProvider: MessageProviderPort,
+    private readonly ticketRepository: TicketRepository = new SequelizeTicketRepository(),
+    private readonly instanceRepository: InstanceRepository = new SequelizeInstanceRepository(),
+    private readonly messageRepository: MessageRepository = new SequelizeMessageRepository(),
+    private readonly unitOfWork: UnitOfWork = new SequelizeUnitOfWork()
+  ) {}
 
-  async listTicketMessages(companyId: number, ticketId: number): Promise<Message[]> {
-    const ticket = await Ticket.findOne({ where: { id: ticketId, company_id: companyId } });
+  async listTicketMessages(companyId: number, ticketId: number, limit = 200, offset = 0): Promise<Message[]> {
+    const ticket = await this.ticketRepository.findByIdAndCompany(ticketId, companyId);
 
     if (!ticket) {
       throw new DomainError('Conversa nao encontrada', 404);
     }
 
-    return Message.findAll({
-      where: { company_id: companyId, ticket_id: ticketId },
-      order: [['created_at', 'ASC']],
+    const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 500) : 200;
+    const safeOffset = Number.isFinite(offset) ? Math.max(offset, 0) : 0;
+
+    return this.messageRepository.listByTicket(companyId, ticketId, {
+      limit: safeLimit,
+      offset: safeOffset,
     });
   }
 
@@ -25,12 +46,12 @@ export default class ConversationMessageApplication {
     operatorName: string,
     text: string
   ): Promise<{ message: Message; provider: Record<string, unknown> }> {
-    const ticket = await Ticket.findOne({ where: { id: ticketId, company_id: companyId } });
+    const ticket = await this.ticketRepository.findByIdAndCompany(ticketId, companyId);
     if (!ticket) {
       throw new DomainError('Conversa nao encontrada', 404);
     }
 
-    const instance = await Instance.findOne({ where: { id: ticket.instance_id, company_id: companyId } });
+    const instance = await this.instanceRepository.findByIdAndCompany(ticket.instance_id, companyId);
     if (!instance) {
       throw new DomainError('Instancia nao encontrada', 404);
     }
@@ -44,23 +65,27 @@ export default class ConversationMessageApplication {
       text: textWithOperator,
     });
 
-    const message = await Message.create({
-      company_id: companyId,
-      ticket_id: ticket.id,
-      instance_id: instance.id,
-      message_id: outbound.messageId,
-      direction: 'outbound',
-      type: 'text',
-      content: outbound.text,
-      metadata: {
-        operatorName,
-        originalText: normalizedText,
-      },
-      status: outbound.status === 'sent' ? 'sent' : 'failed',
-      sent_at: new Date(outbound.sentAt),
+    const message = await this.unitOfWork.runInTransaction(async ({ tx }) => {
+      const persisted = await this.messageRepository.createOutbound(
+        {
+          companyId,
+          ticketId: ticket.id,
+          instanceId: instance.id,
+          messageId: outbound.messageId,
+          content: outbound.text,
+          operatorName,
+          originalText: normalizedText,
+          status: outbound.status === 'sent' ? 'sent' : 'failed',
+          sentAt: new Date(outbound.sentAt),
+        },
+        tx
+      );
+
+      await this.ticketRepository.touchLastMessage(ticket, ticket.contact_name || undefined, tx);
+
+      return persisted;
     });
 
-    await ticket.update({ last_message_at: new Date() });
     emitMessageCreated(message);
     emitTicketUpdated(ticket);
 
