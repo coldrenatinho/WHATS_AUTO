@@ -19,10 +19,12 @@ export interface RegisterData {
 class AuthService {
   async login(data: LoginData) {
     logger.debug('Tentativa de login recebida', { email: data.email });
+    const t0 = Date.now();
     const user = await User.findOne({
       where: { email: data.email },
       include: [{ model: Company, as: 'company' }],
     });
+    logger.debug('User query tempo', { ms: Date.now() - t0 });
 
     if (!user) {
       logger.warn('Login rejeitado: usuario nao encontrado', { email: data.email });
@@ -34,13 +36,17 @@ class AuthService {
       throw new Error('Usuário inativo');
     }
 
+    const t1 = Date.now();
     const isValidPassword = await user.validatePassword(data.password);
+    logger.debug('Password validation tempo', { ms: Date.now() - t1 });
     if (!isValidPassword) {
       logger.warn('Login rejeitado: senha invalida', { userId: user.id, companyId: user.company_id });
       throw new Error('Credenciais inválidas');
     }
 
+    const t2 = Date.now();
     await user.update({ last_login_at: new Date() });
+    logger.debug('Last login update tempo', { ms: Date.now() - t2 });
     logger.info('Ultimo login atualizado', { userId: user.id, companyId: user.company_id });
 
     const token = this.generateToken(user);
