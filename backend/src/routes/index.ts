@@ -71,7 +71,12 @@ routes.delete('/instance/delete/:instance', evolutionCompatController.deleteInst
 
 routes.post('/message/sendText/:instance', evolutionCompatController.sendText.bind(evolutionCompatController));
 
-const compatScopes = ['proxy', 'settings', 'webhook', 'rabbitmq', 'sqs', 'websocket', 'chatwoot'];
+routes.post('/typebot/create/:instance', evolutionCompatController.createTypebot.bind(evolutionCompatController));
+routes.get('/typebot/find/:instance', evolutionCompatController.findTypebot.bind(evolutionCompatController));
+routes.post('/typebot/changeStatus/:instance', evolutionCompatController.changeStatusTypebot.bind(evolutionCompatController));
+routes.post('/typebot/start/:instance', evolutionCompatController.startTypebot.bind(evolutionCompatController));
+
+const compatScopes = ['proxy', 'settings', 'webhook', 'rabbitmq', 'sqs', 'websocket', 'chatwoot', 'n8n'];
 
 compatScopes.forEach((scope) => {
   routes.post(`/${scope}/set/:instance`, evolutionCompatController.setConfig.bind(evolutionCompatController));
@@ -83,7 +88,6 @@ routes.all('/chat/*rest', evolutionCompatController.notImplemented.bind(evolutio
 routes.all('/label/*rest', evolutionCompatController.notImplemented.bind(evolutionCompatController));
 routes.all('/group/*rest', evolutionCompatController.notImplemented.bind(evolutionCompatController));
 routes.all('/call/*rest', evolutionCompatController.notImplemented.bind(evolutionCompatController));
-routes.all('/typebot/*rest', evolutionCompatController.notImplemented.bind(evolutionCompatController));
 routes.all('/evolutionBot/*rest', evolutionCompatController.notImplemented.bind(evolutionCompatController));
 routes.all('/openai/*rest', evolutionCompatController.notImplemented.bind(evolutionCompatController));
 routes.all('/dify/*rest', evolutionCompatController.notImplemented.bind(evolutionCompatController));

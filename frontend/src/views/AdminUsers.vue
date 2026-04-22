@@ -79,8 +79,12 @@ const createUser = async () => {
     form.value = { name: '', email: '', password: '', role: 'agent' }
     success.value = 'Usuário cadastrado com sucesso.'
     await loadUsers()
-  } catch {
-    error.value = 'Não foi possível cadastrar o usuário.'
+  } catch (err: any) {
+    if (err.response && err.response.data && err.response.data.error) {
+      error.value = err.response.data.error
+    } else {
+      error.value = 'Não foi possível cadastrar o usuário.'
+    }
   } finally {
     isSaving.value = false
   }

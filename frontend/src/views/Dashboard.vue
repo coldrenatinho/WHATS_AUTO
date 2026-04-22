@@ -3,7 +3,7 @@ import { computed, ref, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import api from '../services/api'
 import { sendPing, useSocketState } from '../services/socket'
-import { UiCard, UiSectionHeader } from '../components/ui'
+import { UiSectionHeader } from '../components/ui'
 
 const stats = ref({
   totalTickets: 0,
@@ -22,11 +22,11 @@ const { isConnected, lastError, lastServerMessage, lastPongAt, lastRealtimeEvent
 const todayLabel = computed(() => dayjs().format('DD/MM/YYYY'))
 const realtimeBadgeClass = computed(() =>
   isConnected.value
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-700/40 dark:bg-emerald-500/10 dark:text-emerald-300'
-    : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-700/40 dark:bg-rose-500/10 dark:text-rose-300'
+    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+    : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
 )
 const realtimeBadgeText = computed(() =>
-  isConnected.value ? 'Tempo real conectado' : 'Tempo real desconectado'
+  isConnected.value ? 'Online - Realtime' : 'Desconectado'
 )
 
 onMounted(async () => {
@@ -51,207 +51,233 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-      <UiSectionHeader title="Dashboard" subtitle="Visao geral da operacao do seu chatbot" />
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-700/40 dark:bg-emerald-500/10 dark:text-emerald-300">
-          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-          Plataforma ativa
+  <div class="space-y-8 animate-fade-in pb-10">
+    <!-- Page Header Hero -->
+    <section class="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 p-8 text-white shadow-2xl">
+      <div class="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl"></div>
+      <div class="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-orange-500/20 blur-3xl"></div>
+      
+      <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-2">Visão Geral da Operação</p>
+          <h1 class="text-4xl font-bold tracking-tight mb-2">Dashboard de Comando</h1>
+          <p class="text-emerald-100/70 max-w-xl">
+            Acompanhe em tempo real o volume de conversas, o tempo de resposta da sua equipe e a saúde das integrações do WhatsApp.
+          </p>
         </div>
-        <div :class="['inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold', realtimeBadgeClass]">
-          <span :class="['h-2 w-2 rounded-full', isConnected ? 'bg-emerald-500' : 'bg-rose-500']"></span>
-          {{ realtimeBadgeText }}
-        </div>
-        <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-          <svg class="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {{ todayLabel }}
-          <span v-if="lastUpdatedAt" class="text-slate-400 dark:text-slate-500">• atualizado {{ lastUpdatedAt }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid gap-3 md:grid-cols-3">
-      <UiCard>
-        <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Realtime</p>
-        <p class="mt-2 font-semibold">{{ lastServerMessage || 'Aguardando evento de boas-vindas...' }}</p>
-      </UiCard>
-      <UiCard>
-        <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Heartbeat</p>
-        <p class="mt-2 font-semibold">{{ lastPongAt ? `Ultimo pong em ${dayjs(lastPongAt).format('DD/MM/YYYY HH:mm:ss')}` : 'Sem pong recebido ainda' }}</p>
-      </UiCard>
-      <UiCard>
-        <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Falhas</p>
-        <p class="mt-2 font-semibold">{{ lastError || 'Nenhum erro de conexao' }}</p>
-      </UiCard>
-    </div>
-
-    <div class="grid gap-3 md:grid-cols-3">
-      <UiCard>
-        <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Eventos de Ticket</p>
-        <p class="mt-2 text-lg font-semibold">{{ ticketEventsCount }}</p>
-      </UiCard>
-      <UiCard>
-        <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Eventos de Mensagem</p>
-        <p class="mt-2 text-lg font-semibold">{{ messageEventsCount }}</p>
-      </UiCard>
-      <UiCard>
-        <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Ultimo Evento</p>
-        <p class="mt-2 font-semibold">{{ lastRealtimeEvent || 'Sem eventos ainda' }}</p>
-      </UiCard>
-    </div>
-
-    <div v-if="loading" class="rounded-xl border border-gray-200 bg-white p-5 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-      Carregando indicadores da operação...
-    </div>
-
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <!-- Total Tickets -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Total de Conversas</p>
-            <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-              {{ stats.totalTickets }}
-            </p>
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <div :class="['inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold backdrop-blur-md', realtimeBadgeClass]">
+            <span :class="['h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]', isConnected ? 'bg-emerald-500' : 'bg-rose-500']"></span>
+            {{ realtimeBadgeText }}
           </div>
-          <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+          <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md px-4 py-2 text-sm font-medium text-white/80">
+            <svg class="h-4 w-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
+            {{ todayLabel }}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div v-if="loading" class="flex h-32 items-center justify-center rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-50/50">
+      <v-progress-circular indeterminate color="primary"></v-progress-circular>
+    </div>
+
+    <template v-else>
+      <!-- Stats Cards Row -->
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <!-- Total Tickets -->
+        <div class="group relative overflow-hidden rounded-[1.5rem] bg-white p-6 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all hover:-translate-y-1 hover:shadow-2xl dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
+          <div class="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-blue-500/10 transition-transform group-hover:scale-150"></div>
+          <div class="relative z-10 flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total de Conversas</p>
+              <p class="mt-2 text-4xl font-bold text-slate-900 dark:text-white">{{ stats.totalTickets }}</p>
+            </div>
+            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30">
+              <v-icon icon="mdi-message-text-outline" size="x-large"></v-icon>
+            </div>
+          </div>
+        </div>
+
+        <!-- Open Tickets -->
+        <div class="group relative overflow-hidden rounded-[1.5rem] bg-white p-6 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all hover:-translate-y-1 hover:shadow-2xl dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
+          <div class="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-orange-500/10 transition-transform group-hover:scale-150"></div>
+          <div class="relative z-10 flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Conversas Abertas</p>
+              <p class="mt-2 text-4xl font-bold text-slate-900 dark:text-white">{{ stats.openTickets }}</p>
+            </div>
+            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-500 text-white shadow-lg shadow-orange-500/30">
+              <v-icon icon="mdi-account-clock-outline" size="x-large"></v-icon>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resolved Today -->
+        <div class="group relative overflow-hidden rounded-[1.5rem] bg-white p-6 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all hover:-translate-y-1 hover:shadow-2xl dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
+          <div class="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-emerald-500/10 transition-transform group-hover:scale-150"></div>
+          <div class="relative z-10 flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Resolvidas Hoje</p>
+              <p class="mt-2 text-4xl font-bold text-slate-900 dark:text-white">{{ stats.resolvedToday }}</p>
+            </div>
+            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30">
+              <v-icon icon="mdi-check-decagram-outline" size="x-large"></v-icon>
+            </div>
+          </div>
+        </div>
+
+        <!-- Avg Response Time -->
+        <div class="group relative overflow-hidden rounded-[1.5rem] bg-white p-6 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all hover:-translate-y-1 hover:shadow-2xl dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
+          <div class="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-purple-500/10 transition-transform group-hover:scale-150"></div>
+          <div class="relative z-10 flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Tempo Médio</p>
+              <p class="mt-2 text-4xl font-bold text-slate-900 dark:text-white">{{ stats.avgResponseTime }}</p>
+            </div>
+            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/30">
+              <v-icon icon="mdi-timer-outline" size="x-large"></v-icon>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Open Tickets -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Conversas Abertas</p>
-            <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-              {{ stats.openTickets }}
-            </p>
+      <!-- Infrastructure Row -->
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <!-- Infrastructure Metrics -->
+        <div class="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-5 dark:border-slate-700 dark:bg-slate-800/60">
+            <div class="flex items-center gap-3 mb-2">
+              <v-icon icon="mdi-whatsapp" color="success"></v-icon>
+              <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Instâncias Ativas</p>
+            </div>
+            <p class="text-3xl font-bold text-slate-900 dark:text-white">{{ stats.totalInstances }}</p>
           </div>
-          <div class="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+          
+          <div class="rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-5 dark:border-slate-700 dark:bg-slate-800/60">
+            <div class="flex items-center gap-3 mb-2">
+              <v-icon icon="mdi-robot-outline" color="primary"></v-icon>
+              <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Fluxos Ativos</p>
+            </div>
+            <p class="text-3xl font-bold text-slate-900 dark:text-white">{{ stats.activeFlows }}</p>
           </div>
+          
+          <div class="rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-5 dark:border-slate-700 dark:bg-slate-800/60">
+            <div class="flex items-center gap-3 mb-2">
+              <v-icon icon="mdi-headset" color="info"></v-icon>
+              <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Agentes Disponíveis</p>
+            </div>
+            <p class="text-3xl font-bold text-slate-900 dark:text-white">{{ stats.totalAgents }}</p>
+          </div>
+        </div>
+
+        <!-- SLA Mini Panel -->
+        <div class="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/40 dark:border-slate-700 dark:bg-slate-800 dark:shadow-none flex flex-col justify-center">
+          <p class="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Meta de Resolução</p>
+          <div class="flex items-end gap-2 mb-2">
+            <span class="text-4xl font-bold text-emerald-500">82%</span>
+            <span class="text-sm font-medium text-emerald-600 mb-1">no 1º contato</span>
+          </div>
+          <v-progress-linear model-value="82" color="success" height="8" rounded></v-progress-linear>
+          <p class="mt-3 text-sm text-slate-500">Sua equipe está superando a meta diária de atendimento.</p>
         </div>
       </div>
 
-      <!-- Resolved Today -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Resolvidas Hoje</p>
-            <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-              {{ stats.resolvedToday }}
-            </p>
+      <!-- Quick Actions and System Events Row -->
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Quick Actions -->
+        <div class="rounded-[2rem] border border-slate-200/70 bg-white/80 p-8 shadow-xl shadow-slate-200/30 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
+          <h2 class="mb-6 text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <v-icon icon="mdi-lightning-bolt" color="warning"></v-icon> Ações Rápidas
+          </h2>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <router-link to="/tickets" class="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-6 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:shadow-lg hover:shadow-emerald-100 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-emerald-700 dark:hover:bg-slate-800">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-700 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                <v-icon icon="mdi-forum-outline" :class="{'text-emerald-500': true, 'group-hover:text-white': true}"></v-icon>
+              </div>
+              <span class="font-medium text-slate-700 dark:text-slate-300">Caixa de Entrada</span>
+            </router-link>
+
+            <router-link to="/instances" class="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-6 transition-all hover:border-blue-200 hover:bg-blue-50 hover:shadow-lg hover:shadow-blue-100 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-blue-700 dark:hover:bg-slate-800">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-700 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                <v-icon icon="mdi-cellphone-link" :class="{'text-blue-500': true, 'group-hover:text-white': true}"></v-icon>
+              </div>
+              <span class="font-medium text-slate-700 dark:text-slate-300">Conectar Número</span>
+            </router-link>
+
+            <router-link to="/flows" class="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-6 transition-all hover:border-purple-200 hover:bg-purple-50 hover:shadow-lg hover:shadow-purple-100 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-purple-700 dark:hover:bg-slate-800">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-700 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                <v-icon icon="mdi-sitemap-outline" :class="{'text-purple-500': true, 'group-hover:text-white': true}"></v-icon>
+              </div>
+              <span class="font-medium text-slate-700 dark:text-slate-300">Criar Automação</span>
+            </router-link>
+
+            <router-link to="/settings" class="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-6 transition-all hover:border-slate-300 hover:bg-white hover:shadow-lg dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600 dark:hover:bg-slate-800">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-700 group-hover:bg-slate-800 group-hover:text-white transition-colors">
+                <v-icon icon="mdi-cog-outline" :class="{'text-slate-500': true, 'group-hover:text-white': true}"></v-icon>
+              </div>
+              <span class="font-medium text-slate-700 dark:text-slate-300">Configurações</span>
+            </router-link>
           </div>
-          <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+        </div>
+
+        <!-- System Events Mini Terminal -->
+        <div class="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 shadow-2xl text-slate-300 font-mono text-sm overflow-hidden flex flex-col">
+          <div class="flex items-center gap-2 mb-4 border-b border-slate-800 pb-4">
+            <div class="flex gap-1.5">
+              <div class="w-3 h-3 rounded-full bg-rose-500"></div>
+              <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+              <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+            </div>
+            <span class="ml-2 text-slate-500 text-xs">system_monitor.log</span>
+          </div>
+          
+          <div class="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+            <div class="flex gap-3">
+              <span class="text-emerald-500 shrink-0">[{{ dayjs().format('HH:mm:ss') }}]</span>
+              <span><span class="text-blue-400">INFO</span>: WebSocket Service {{ isConnected ? 'Connected' : 'Disconnected' }}</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="text-emerald-500 shrink-0">[{{ lastUpdatedAt.split(' ')[1] || dayjs().format('HH:mm:ss') }}]</span>
+              <span><span class="text-blue-400">INFO</span>: Data synced from core API</span>
+            </div>
+            <div class="flex gap-3" v-if="lastServerMessage">
+              <span class="text-emerald-500 shrink-0">[{{ dayjs().format('HH:mm:ss') }}]</span>
+              <span><span class="text-blue-400">EVT</span>: {{ lastServerMessage }}</span>
+            </div>
+            <div class="flex gap-3 text-slate-500">
+              <span class="shrink-0">></span>
+              <span class="animate-pulse">_</span>
+            </div>
+          </div>
+          
+          <div class="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 gap-4 text-xs">
+            <div>
+              <span class="text-slate-500">MSG EVENTS:</span> <span class="text-emerald-400 font-bold">{{ messageEventsCount }}</span>
+            </div>
+            <div>
+              <span class="text-slate-500">TKT EVENTS:</span> <span class="text-blue-400 font-bold">{{ ticketEventsCount }}</span>
+            </div>
           </div>
         </div>
       </div>
-
-      <!-- Avg Response Time -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Tempo Médio</p>
-            <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-              {{ stats.avgResponseTime }}
-            </p>
-          </div>
-          <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <p class="text-sm text-gray-600 dark:text-gray-400">Instâncias cadastradas</p>
-        <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.totalInstances }}</p>
-      </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <p class="text-sm text-gray-600 dark:text-gray-400">Fluxos ativos</p>
-        <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.activeFlows }}</p>
-      </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <p class="text-sm text-gray-600 dark:text-gray-400">Agentes ativos</p>
-        <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.totalAgents }}</p>
-      </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Ações Rápidas</h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <router-link 
-          to="/tickets" 
-          class="flex flex-col items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-        >
-          <svg class="w-8 h-8 text-emerald-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-          </svg>
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Nova Conversa</span>
-        </router-link>
-
-        <router-link 
-          to="/instances" 
-          class="flex flex-col items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-        >
-          <svg class="w-8 h-8 text-emerald-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-          </svg>
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Instâncias</span>
-        </router-link>
-
-        <router-link 
-          to="/flows" 
-          class="flex flex-col items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-        >
-          <svg class="w-8 h-8 text-emerald-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-          </svg>
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Automações</span>
-        </router-link>
-
-        <router-link 
-          to="/settings" 
-          class="flex flex-col items-center p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-        >
-          <svg class="w-8 h-8 text-emerald-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-          </svg>
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Configurações</span>
-        </router-link>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div class="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-slate-100 lg:col-span-2 dark:border-slate-700">
-        <p class="text-xs uppercase tracking-[0.12em] text-slate-300">SLA Operacional</p>
-        <p class="mt-2 text-2xl font-semibold">Tempo medio abaixo da meta</p>
-        <p class="mt-3 text-sm text-slate-300">Seu time esta mantendo qualidade de atendimento com excelente velocidade de resposta.</p>
-      </div>
-      <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Meta do Dia</p>
-        <p class="mt-2 text-3xl font-bold text-emerald-600 dark:text-emerald-400">82%</p>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">de conversas com resolucao no primeiro contato</p>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+</style>

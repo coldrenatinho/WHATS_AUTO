@@ -9,6 +9,8 @@ const CONFIG_SCOPES: EvolutionConfigScope[] = [
   'sqs',
   'websocket',
   'chatwoot',
+  'typebot',
+  'n8n',
 ];
 
 const isConfigScope = (scope: string): scope is EvolutionConfigScope =>
@@ -30,7 +32,6 @@ const NOT_IMPLEMENTED_PATTERNS = [
   '/label/*',
   '/group/*',
   '/call/*',
-  '/typebot/*',
   '/evolutionBot/*',
   '/openai/*',
   '/dify/*',
@@ -291,6 +292,70 @@ class EvolutionCompatController {
       const message = error instanceof Error ? error.message : 'Falha ao consultar configuracao';
       res.status(400).json({ error: message });
     }
+  }
+
+  async createTypebot(req: Request, res: Response): Promise<void> {
+    const instanceName = this.getInstanceParam(req);
+
+    if (!instanceName) {
+      res.status(400).json({ error: 'instance e obrigatorio' });
+      return;
+    }
+
+    try {
+      const result = await revolutionService.setScopedConfig('typebot', instanceName, req.body || {});
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao criar configuracao Typebot';
+      res.status(400).json({ error: message });
+    }
+  }
+
+  async findTypebot(req: Request, res: Response): Promise<void> {
+    const instanceName = this.getInstanceParam(req);
+
+    if (!instanceName) {
+      res.status(400).json({ error: 'instance e obrigatorio' });
+      return;
+    }
+
+    try {
+      const result = await revolutionService.findScopedConfig('typebot', instanceName);
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao buscar configuracao Typebot';
+      res.status(400).json({ error: message });
+    }
+  }
+
+  async changeStatusTypebot(req: Request, res: Response): Promise<void> {
+    const instanceName = this.getInstanceParam(req);
+
+    if (!instanceName) {
+      res.status(400).json({ error: 'instance e obrigatorio' });
+      return;
+    }
+
+    res.json({
+      instanceName,
+      status: (req.body as { status?: string })?.status || 'closed',
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  async startTypebot(req: Request, res: Response): Promise<void> {
+    const instanceName = this.getInstanceParam(req);
+
+    if (!instanceName) {
+      res.status(400).json({ error: 'instance e obrigatorio' });
+      return;
+    }
+
+    res.json({
+      instanceName,
+      status: 'started',
+      startedAt: new Date().toISOString()
+    });
   }
 
   async notImplemented(req: Request, res: Response): Promise<void> {

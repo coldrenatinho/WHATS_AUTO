@@ -38,7 +38,9 @@ type EvolutionConfigScope =
   | 'rabbitmq'
   | 'sqs'
   | 'websocket'
-  | 'chatwoot';
+  | 'chatwoot'
+  | 'typebot'
+  | 'n8n';
 
 class RevolutionService {
   private readonly instances = new Map<string, RevolutionInstanceMock>();
