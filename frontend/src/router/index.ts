@@ -102,10 +102,6 @@ router.beforeEach(async (to) => {
     return getHomeByRole(authStore.user?.role)
   }
 
-  if (to.path === '/' && authStore.isAuthenticated) {
-    return getHomeByRole(authStore.user?.role)
-  }
-
   return true
 })
 

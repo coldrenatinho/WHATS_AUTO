@@ -22,15 +22,18 @@ const handleLogin = async () => {
   isLoading.value = true
   error.value = ''
 
-  const result = await authStore.login(email.value, password.value)
+  try {
+    const result = await authStore.login(email.value, password.value)
 
-  if (result.success) {
-    router.push('/')
-  } else {
+    if (result.success) {
+      await router.replace('/')
+      return
+    }
+
     error.value = result.error || 'Erro ao fazer login'
+  } finally {
+    isLoading.value = false
   }
-
-  isLoading.value = false
 }
 
 onMounted(() => {
