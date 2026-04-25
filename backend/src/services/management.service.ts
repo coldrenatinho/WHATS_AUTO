@@ -1,6 +1,6 @@
-import { Op } from 'sequelize';
+import { Op, QueryTypes } from 'sequelize';
 import DomainError from '../core/errors/domain.error';
-import { Flow, FlowWorkspace, Instance, Ticket, User, MessageTemplate } from '../models';
+import { Flow, FlowWorkspace, Instance, Ticket, User, MessageTemplate, sequelize } from '../models';
 import revolutionService from './revolution.service';
 import logger from '../utils';
 
@@ -177,23 +177,38 @@ class ManagementService {
   }
 
   async getDashboard(companyId: number): Promise<DashboardSummary> {
-    const [totalTickets, openTickets, resolvedToday, totalInstances, activeFlows, totalAgents] = await Promise.all([
-      Ticket.count({ where: { company_id: companyId } }),
-      Ticket.count({ where: { company_id: companyId, status: { [Op.in]: ['open', 'pending', 'in_progress'] } } }),
-      Ticket.count({ where: { company_id: companyId, status: 'resolved' } }),
-      Instance.count({ where: { company_id: companyId } }),
-      Flow.count({ where: { company_id: companyId, is_active: true } }),
-      User.count({ where: { company_id: companyId, role: { [Op.in]: ['agent', 'manager'] }, is_active: true } }),
-    ]);
+    const summary = await sequelize.query<{
+      totalTickets: number;
+      openTickets: number;
+      resolvedToday: number;
+      totalInstances: number;
+      activeFlows: number;
+      totalAgents: number;
+    }>(
+      `
+      SELECT
+        (SELECT COUNT(*) FROM tickets WHERE company_id = :companyId) AS totalTickets,
+        (SELECT COUNT(*) FROM tickets WHERE company_id = :companyId AND status IN ('open', 'pending', 'in_progress')) AS openTickets,
+        (SELECT COUNT(*) FROM tickets WHERE company_id = :companyId AND status = 'resolved') AS resolvedToday,
+        (SELECT COUNT(*) FROM instances WHERE company_id = :companyId) AS totalInstances,
+        (SELECT COUNT(*) FROM flows WHERE company_id = :companyId AND is_active = true) AS activeFlows,
+        (SELECT COUNT(*) FROM users WHERE company_id = :companyId AND role IN ('agent', 'manager') AND is_active = true) AS totalAgents
+      `,
+      {
+        replacements: { companyId },
+        type: QueryTypes.SELECT,
+        plain: true,
+      }
+    );
 
     return {
-      totalTickets,
-      openTickets,
-      resolvedToday,
+      totalTickets: Number(summary?.totalTickets || 0),
+      openTickets: Number(summary?.openTickets || 0),
+      resolvedToday: Number(summary?.resolvedToday || 0),
       avgResponseTime: '5min',
-      totalInstances,
-      activeFlows,
-      totalAgents,
+      totalInstances: Number(summary?.totalInstances || 0),
+      activeFlows: Number(summary?.activeFlows || 0),
+      totalAgents: Number(summary?.totalAgents || 0),
     };
   }
 

@@ -9,6 +9,25 @@ type RateLimitEntry = {
   resetAt: number;
 };
 
+type AuthCacheEntry = {
+  user: User;
+  company?: Company;
+  expiresAt: number;
+};
+
+const authCache = new Map<string, AuthCacheEntry>();
+const authCacheTtlMs = Number(process.env.AUTH_CACHE_TTL_MS || 30_000);
+
+const getAuthCacheKey = (userId: number, companyId: number): string => `${userId}:${companyId}`;
+
+const setAuthCache = (key: string, user: User): void => {
+  authCache.set(key, {
+    user,
+    company: user.company,
+    expiresAt: Date.now() + authCacheTtlMs,
+  });
+};
+
 interface RateLimitOptions {
   windowMs: number;
   max: number;
@@ -185,6 +204,19 @@ export const authMiddleware = async (
     }
 
     const decoded = jwt.verify(token, secret) as JwtPayload;
+    const cacheKey = getAuthCacheKey(decoded.userId, decoded.companyId);
+    const cached = authCache.get(cacheKey);
+
+    if (cached && cached.expiresAt > Date.now()) {
+      req.user = cached.user;
+      req.company = cached.company;
+      next();
+      return;
+    }
+
+    if (cached) {
+      authCache.delete(cacheKey);
+    }
 
     const user = await User.findByPk(decoded.userId, {
       include: [{ model: Company, as: 'company' }],
@@ -195,6 +227,12 @@ export const authMiddleware = async (
       return;
     }
 
+    if (user.company_id !== decoded.companyId) {
+      res.status(401).json({ error: 'Token inválido' });
+      return;
+    }
+
+    setAuthCache(cacheKey, user);
     req.user = user;
     req.company = user.company;
 
