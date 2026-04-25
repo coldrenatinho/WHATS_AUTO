@@ -1,4 +1,4 @@
-import { Sequelize, DataTypes } from 'sequelize';
+import { Sequelize, DataTypes, QueryTypes } from 'sequelize';
 import { QueryInterface } from 'sequelize/types';
 import path from 'path';
 import fs from 'fs';
@@ -110,15 +110,12 @@ class MigrationRunner {
    */
   private async getExecutedMigrations(): Promise<string[]> {
     try {
-      const results = await this.sequelize.query(
-        'SELECT name FROM sequelizemeta ORDER BY executed_at ASC'
+      const results = await this.sequelize.query<{ name: string }>(
+        'SELECT name FROM sequelizemeta ORDER BY executed_at ASC',
+        { type: QueryTypes.SELECT }
       );
 
-      if (Array.isArray(results[0])) {
-        return results[0].map((row: any) => this.canonicalMigrationName(row.name));
-      }
-
-      return [];
+      return results.map((row) => this.canonicalMigrationName(row.name));
     } catch (error) {
       console.warn('Não foi possível ler migrações executadas');
       return [];
@@ -225,16 +222,12 @@ class MigrationRunner {
    * Obter última migração executada
    */
   private async getLastMigration(): Promise<string | null> {
-    const results = await this.sequelize.query(
-      'SELECT name FROM sequelizemeta ORDER BY executed_at DESC LIMIT 1'
+    const results = await this.sequelize.query<{ name: string }>(
+      'SELECT name FROM sequelizemeta ORDER BY executed_at DESC LIMIT 1',
+      { type: QueryTypes.SELECT }
     );
 
-    if (Array.isArray(results[0]) && results[0].length > 0) {
-      const [firstRow] = results[0] as Array<{ name: string }>;
-      return firstRow?.name ?? null;
-    }
-
-    return null;
+    return results[0]?.name ?? null;
   }
 
   /**
