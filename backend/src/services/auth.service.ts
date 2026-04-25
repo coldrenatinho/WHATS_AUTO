@@ -44,10 +44,20 @@ class AuthService {
       throw new Error('Credenciais inválidas');
     }
 
-    const t2 = Date.now();
-    await user.update({ last_login_at: new Date() });
-    logger.debug('Last login update tempo', { ms: Date.now() - t2 });
-    logger.info('Ultimo login atualizado', { userId: user.id, companyId: user.company_id });
+    void User.update(
+      { last_login_at: new Date() },
+      { where: { id: user.id }, hooks: false }
+    )
+      .then(() => {
+        logger.info('Ultimo login atualizado', { userId: user.id, companyId: user.company_id });
+      })
+      .catch((error) => {
+        logger.warn('Falha ao atualizar ultimo login', {
+          userId: user.id,
+          companyId: user.company_id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
 
     const token = this.generateToken(user);
 

@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { Company, User, sequelize } from '../models';
 import logger from '../utils';
 import { AuthRequest } from '../middlewares';
-import bcrypt from 'bcryptjs';
 
 const createCompanySchema = z.object({
   name: z.string().trim().min(2, 'Nome da empresa é obrigatório').max(255),
