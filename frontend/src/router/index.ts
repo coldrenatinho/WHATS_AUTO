@@ -17,6 +17,12 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/design-system',
+    name: 'DesignSystemShowcase',
+    component: () => import('../views/DesignSystemShowcase.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/',
     name: 'Dashboard',
     component: () => import('../views/Dashboard.vue'),
