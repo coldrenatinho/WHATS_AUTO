@@ -209,6 +209,7 @@ services:
 
   # ─── Typebot Builder (Construtor Visual) ────────────────────────
   typebot-builder:
+    profiles: ["typebot"]
     image: baptiste-arnaud/typebot-builder:latest
     container_name: typebot_builder
     restart: unless-stopped
@@ -235,6 +236,7 @@ services:
 
   # ─── Typebot Viewer (Motor de Chat) ─────────────────────────────
   typebot-viewer:
+    profiles: ["typebot"]
     image: baptiste-arnaud/typebot-viewer:latest
     container_name: typebot_viewer
     restart: unless-stopped
