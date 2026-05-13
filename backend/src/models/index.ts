@@ -9,6 +9,7 @@ import Flow from './Flow';
 import FlowWorkspace from './FlowWorkspace';
 import BotConfig from './BotConfig';
 import TicketAudit from './TicketAudit';
+import OperationalEvent from './OperationalEvent';
 
 // ═══════════════════════════════════════════════════════════════
 // Associações entre Models
@@ -74,6 +75,10 @@ BotConfig.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
 Company.hasMany(TicketAudit, { foreignKey: 'company_id', as: 'ticket_audits' });
 TicketAudit.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
 
+// Company -> OperationalEvents (1:N)
+Company.hasMany(OperationalEvent, { foreignKey: 'company_id', as: 'operational_events' });
+OperationalEvent.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
+
 // User -> TicketAudits (1:N)
 User.hasMany(TicketAudit, { foreignKey: 'actor_user_id', as: 'ticket_audits' });
 TicketAudit.belongsTo(User, { foreignKey: 'actor_user_id', as: 'actor' });
@@ -89,7 +94,8 @@ export {
   Flow,
   FlowWorkspace,
   BotConfig,
-  TicketAudit
+  TicketAudit,
+  OperationalEvent
 };
 
 export default {
@@ -103,5 +109,6 @@ export default {
   Flow,
   FlowWorkspace,
   BotConfig,
-  TicketAudit
+  TicketAudit,
+  OperationalEvent
 };

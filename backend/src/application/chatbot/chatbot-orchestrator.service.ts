@@ -19,6 +19,7 @@ import {
   SequelizeTicketRepository,
 } from '../../infrastructure/persistence/sequelize/sequelize-chatbot.repositories';
 import SequelizeUnitOfWork from '../../infrastructure/persistence/sequelize/sequelize-unit-of-work';
+import operationalEventService from '../../services/operational-event.service';
 
 export type InboundProcessingResult = {
   received: boolean;
@@ -140,6 +141,20 @@ export default class ChatbotOrchestratorService {
     }
     emitTicketUpdated(persistenceResult.ticket);
     emitMessageCreated(persistenceResult.inboundMessage);
+
+    await operationalEventService.record({
+      companyId: instance.company_id,
+      ticketId: persistenceResult.ticket.id,
+      messageId: persistenceResult.inboundMessage.id,
+      eventType: 'message_saved',
+      status: 'success',
+      source: 'chatbot-orchestrator',
+      detail: 'Mensagem inbound salva',
+      metadata: {
+        externalMessageId: parsed.externalMessageId,
+        wasNewTicket: persistenceResult.wasNew,
+      },
+    });
 
     const flows: Flow[] = await this.flowRepository.listActiveWebhookFlows(instance.company_id);
 

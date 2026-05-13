@@ -36,6 +36,12 @@ Plataforma multi-tenant de atendimento WhatsApp da Norte MT Sistemas, com backen
 - [Arquitetura](docs/ARQUITETURA.md)
 - [Decisoes arquiteturais](docs/DECISOES_ARQUITETURA.md)
 - [UML e diagramas](docs/UML.md)
+- [Operacao e confiabilidade](docs/OPERACAO.md)
+- [Seguranca e LGPD](docs/SEGURANCA_LGPD.md)
+- [Politica de privacidade - modelo](docs/POLITICA_PRIVACIDADE_MODELO.md)
+- [Termos de uso - modelo](docs/TERMOS_USO_MODELO.md)
+- [DPA controlador/operador - modelo](docs/DPA_OPERADOR_CONTROLADOR_MODELO.md)
+- [Procedimento de incidente](docs/PROCEDIMENTO_INCIDENTE_SEGURANCA.md)
 - [Documentação detalhada](docs/guia-da-aplicacao-e-do-codigo.md)
 - `backend/`: API, modelos, middlewares, controllers, serviços, testes e OpenAPI.
 - `frontend/`: SPA em Vue 3 com layout, rotas, stores e builder de workflow.

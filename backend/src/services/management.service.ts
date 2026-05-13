@@ -3,6 +3,7 @@ import DomainError from '../core/errors/domain.error';
 import { Flow, FlowWorkspace, Instance, Message, Ticket, TicketAudit, User, MessageTemplate, sequelize } from '../models';
 import revolutionService from './revolution.service';
 import logger from '../utils';
+import operationalEventService from './operational-event.service';
 
 type UserRole = 'admin' | 'manager' | 'agent' | 'viewer';
 type TicketStatus = 'open' | 'pending' | 'in_progress' | 'resolved' | 'closed';
@@ -115,6 +116,34 @@ export interface CreateMessageTemplateInput {
   category?: 'greeting' | 'closing' | 'help' | 'transfer' | 'custom';
 }
 
+const STANDARD_MESSAGE_TEMPLATES: Required<CreateMessageTemplateInput>[] = [
+  {
+    name: 'Saudacao inicial',
+    category: 'greeting',
+    content: 'Ola, {{nome}}! Sou {{operador}} da {{empresa}}. Como posso ajudar?',
+  },
+  {
+    name: 'Aguardando retorno',
+    category: 'help',
+    content: 'Fico no aguardo do seu retorno. Se preferir, pode enviar sua duvida em uma unica mensagem.',
+  },
+  {
+    name: 'Transferencia de atendimento',
+    category: 'transfer',
+    content: 'Vou transferir seu atendimento para o setor responsavel. Um momento, por favor.',
+  },
+  {
+    name: 'Fora do horario',
+    category: 'help',
+    content: 'Recebemos sua mensagem fora do nosso horario de atendimento. Retornaremos assim que a equipe estiver disponivel.',
+  },
+  {
+    name: 'Encerramento cordial',
+    category: 'closing',
+    content: 'Seu atendimento foi concluido. Obrigado pelo contato e seguimos a disposicao.',
+  },
+];
+
 export interface TransferTicketInput {
   user_id?: number;
   status?: TicketStatus;
@@ -123,6 +152,24 @@ export interface TransferTicketInput {
 export interface TicketAuditActor {
   id?: number;
   name?: string;
+}
+
+export interface ContactDataExport {
+  contactPhone: string;
+  exportedAt: string;
+  tickets: Array<Record<string, unknown>>;
+}
+
+export interface PrivacyDeletionResult {
+  contactPhone: string;
+  anonymizedTickets: number;
+  anonymizedMessages: number;
+}
+
+export interface RetentionResult {
+  retentionDays: number;
+  cutoffDate: string;
+  anonymizedMessages: number;
 }
 
 class ManagementService {
@@ -189,6 +236,15 @@ class ManagementService {
     const safeUser = user.get({ plain: true }) as unknown as Record<string, unknown> & { password?: string };
     delete safeUser.password;
     return safeUser;
+  }
+
+  private normalizeContactPhone(contactPhone: string): string {
+    const normalized = contactPhone.replace(/\D/g, '');
+    if (!normalized) {
+      throw new DomainError('Telefone do contato invalido', 400);
+    }
+
+    return normalized;
   }
 
   private async createTicketAudit(input: {
@@ -325,7 +381,7 @@ class ManagementService {
     });
   }
 
-  async createUser(companyId: number, input: CreateUserInput): Promise<Record<string, unknown>> {
+  async createUser(companyId: number, input: CreateUserInput, actor?: TicketAuditActor): Promise<Record<string, unknown>> {
     const { name, email, password, role } = input;
 
     if (!name || !email || !password) {
@@ -351,10 +407,23 @@ class ManagementService {
       role: user.role,
     });
 
+    await operationalEventService.record({
+      companyId,
+      eventType: 'admin_action',
+      status: 'success',
+      source: 'management.users',
+      detail: 'usuario_criado',
+      metadata: {
+        actor,
+        targetUserId: user.id,
+        targetUserRole: user.role,
+      },
+    });
+
     return this.sanitizeUser(user);
   }
 
-  async updateUser(companyId: number, userId: number, input: UpdateUserInput): Promise<Record<string, unknown>> {
+  async updateUser(companyId: number, userId: number, input: UpdateUserInput, actor?: TicketAuditActor): Promise<Record<string, unknown>> {
     const user = await User.findOne({ where: { id: userId, company_id: companyId } });
     if (!user) {
       throw new DomainError('Usuario nao encontrado', 404);
@@ -376,7 +445,179 @@ class ManagementService {
       isActive: user.is_active,
     });
 
+    await operationalEventService.record({
+      companyId,
+      eventType: 'admin_action',
+      status: 'success',
+      source: 'management.users',
+      detail: 'usuario_atualizado',
+      metadata: {
+        actor,
+        targetUserId: user.id,
+        changedFields: Object.keys(input).filter((field) => field !== 'password'),
+        passwordChanged: Boolean(input.password),
+      },
+    });
+
     return this.sanitizeUser(user);
+  }
+
+  async exportContactData(companyId: number, contactPhone: string, actor?: TicketAuditActor): Promise<ContactDataExport> {
+    const normalizedPhone = this.normalizeContactPhone(contactPhone);
+    const tickets = await Ticket.findAll({
+      where: { company_id: companyId, contact_phone: normalizedPhone },
+      include: [
+        { model: User, as: 'agent', attributes: ['id', 'name', 'email'] },
+        { model: Instance, as: 'instance', attributes: ['id', 'name', 'phone', 'status'] },
+        { model: Message, as: 'messages', separate: true, order: [['created_at', 'ASC']] },
+        { model: TicketAudit, as: 'audits', separate: true, order: [['created_at', 'ASC']] },
+      ],
+      order: [['created_at', 'DESC']],
+    });
+
+    await operationalEventService.record({
+      companyId,
+      eventType: 'data_exported',
+      status: 'success',
+      source: 'privacy',
+      detail: 'dados_do_contato_exportados',
+      metadata: {
+        actor,
+        contactPhoneLast4: normalizedPhone.slice(-4),
+        ticketCount: tickets.length,
+      },
+    });
+
+    return {
+      contactPhone: normalizedPhone,
+      exportedAt: new Date().toISOString(),
+      tickets: tickets.map((ticket) => ticket.get({ plain: true }) as Record<string, unknown>),
+    };
+  }
+
+  async deleteContactData(companyId: number, contactPhone: string, actor?: TicketAuditActor): Promise<PrivacyDeletionResult> {
+    const normalizedPhone = this.normalizeContactPhone(contactPhone);
+    const transaction = await sequelize.transaction();
+
+    try {
+      const tickets = await Ticket.findAll({
+        where: { company_id: companyId, contact_phone: normalizedPhone },
+        transaction,
+      });
+      const ticketIds = tickets.map((ticket) => ticket.id);
+
+      if (ticketIds.length === 0) {
+        await transaction.commit();
+        await operationalEventService.record({
+          companyId,
+          eventType: 'data_deleted',
+          status: 'warning',
+          source: 'privacy',
+          detail: 'contato_nao_encontrado_para_remocao',
+          metadata: { actor, contactPhoneLast4: normalizedPhone.slice(-4) },
+        });
+        return { contactPhone: normalizedPhone, anonymizedTickets: 0, anonymizedMessages: 0 };
+      }
+
+      const [updatedMessages] = await Message.update(
+        {
+          content: '[removido por solicitacao LGPD]',
+          media_url: null as unknown as string,
+          metadata: {
+            privacyDeletedAt: new Date().toISOString(),
+            privacyReason: 'data_subject_request',
+          },
+        },
+        {
+          where: { company_id: companyId, ticket_id: { [Op.in]: ticketIds } },
+          transaction,
+        }
+      );
+
+      await Promise.all(
+        tickets.map((ticket) => ticket.update(
+          {
+            contact_name: 'Contato removido',
+            contact_phone: `REMOVIDO_${ticket.id}`.slice(0, 20),
+            metadata: {
+              ...(ticket.metadata || {}),
+              privacyDeletedAt: new Date().toISOString(),
+            },
+          },
+          { transaction }
+        ))
+      );
+
+      await transaction.commit();
+
+      await operationalEventService.record({
+        companyId,
+        eventType: 'data_deleted',
+        status: 'success',
+        source: 'privacy',
+        detail: 'dados_do_contato_anonimizados',
+        metadata: {
+          actor,
+          contactPhoneLast4: normalizedPhone.slice(-4),
+          ticketCount: tickets.length,
+          messageCount: updatedMessages,
+        },
+      });
+
+      return {
+        contactPhone: normalizedPhone,
+        anonymizedTickets: tickets.length,
+        anonymizedMessages: updatedMessages,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
+  async applyMessageRetention(companyId: number, retentionDays: number, actor?: TicketAuditActor): Promise<RetentionResult> {
+    if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 3650) {
+      throw new DomainError('Retencao deve estar entre 1 e 3650 dias', 400);
+    }
+
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const retentionWhere: Record<string | symbol, unknown> = {
+      company_id: companyId,
+      created_at: { [Op.lt]: cutoff },
+    };
+    const [updatedMessages] = await Message.update(
+      {
+        content: '[removido por politica de retencao]',
+        media_url: null as unknown as string,
+        metadata: {
+          retentionAppliedAt: new Date().toISOString(),
+          retentionDays,
+        },
+      },
+      {
+        where: retentionWhere,
+      }
+    );
+
+    await operationalEventService.record({
+      companyId,
+      eventType: 'retention_applied',
+      status: 'success',
+      source: 'privacy',
+      detail: 'politica_de_retencao_aplicada',
+      metadata: {
+        actor,
+        retentionDays,
+        cutoffDate: cutoff.toISOString(),
+        messageCount: updatedMessages,
+      },
+    });
+
+    return {
+      retentionDays,
+      cutoffDate: cutoff.toISOString(),
+      anonymizedMessages: updatedMessages,
+    };
   }
 
   async listInstances(companyId: number): Promise<Instance[]> {
@@ -758,6 +999,54 @@ class ManagementService {
     });
 
     return template;
+  }
+
+  async seedStandardMessageTemplates(companyId: number): Promise<{ created: number; skipped: number; templates: MessageTemplate[] }> {
+    let created = 0;
+    let skipped = 0;
+    const templates: MessageTemplate[] = [];
+
+    for (const item of STANDARD_MESSAGE_TEMPLATES) {
+      const existing = await MessageTemplate.findOne({
+        where: {
+          company_id: companyId,
+          name: item.name,
+          category: item.category,
+        },
+        paranoid: false,
+      });
+
+      if (existing && !existing.deleted_at) {
+        skipped += 1;
+        templates.push(existing);
+        continue;
+      }
+
+      if (existing && existing.deleted_at) {
+        await existing.restore();
+        await existing.update({
+          content: item.content,
+          is_active: true,
+        });
+        created += 1;
+        templates.push(existing);
+        continue;
+      }
+
+      const template = await MessageTemplate.create({
+        company_id: companyId,
+        name: item.name,
+        content: item.content,
+        category: item.category,
+        is_active: true,
+      });
+      created += 1;
+      templates.push(template);
+    }
+
+    logger.info('Templates padrao aplicados', { companyId, created, skipped });
+
+    return { created, skipped, templates };
   }
 
   async updateMessageTemplate(companyId: number, templateId: number, input: Partial<CreateMessageTemplateInput>): Promise<MessageTemplate> {

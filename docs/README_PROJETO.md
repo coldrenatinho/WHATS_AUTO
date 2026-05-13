@@ -35,6 +35,12 @@ Principais blocos:
 | [UML e diagramas](./UML.md) | Diagramas Mermaid do sistema, fluxos e entidades |
 | [Diagramas vetoriais SVG](./vetores/README.md) | Versoes vetoriais para Figma, Illustrator, Inkscape e diagrams.net |
 | [Deploy simples](../DEPLOY_SIMPLES.md) | Como subir a stack reduzida com Docker Compose |
+| [Operacao e confiabilidade](./OPERACAO.md) | Logs, diagnostico, retry, backup, health checks, monitoramento e staging |
+| [Seguranca e LGPD](./SEGURANCA_LGPD.md) | Controles de privacidade, retencao, exportacao/remocao por contato, perfis e incidentes |
+| [Politica de privacidade - modelo](./POLITICA_PRIVACIDADE_MODELO.md) | Texto base para revisao juridica e publicacao |
+| [Termos de uso - modelo](./TERMOS_USO_MODELO.md) | Texto base para regras de uso comercial |
+| [DPA controlador/operador - modelo](./DPA_OPERADOR_CONTROLADOR_MODELO.md) | Clausulas base para contrato com clientes |
+| [Procedimento de incidente](./PROCEDIMENTO_INCIDENTE_SEGURANCA.md) | Passo a passo para conter, avaliar e comunicar incidentes |
 | [GitHub Actions](../.github/WORKFLOWS.md) | Como funcionam CI e deploy manual |
 | [Migracoes de banco](./migracao-banco-dados.md) | Como criar, executar e reverter migracoes |
 
