@@ -32,7 +32,9 @@ Plataforma multi-tenant de atendimento WhatsApp da Norte MT Sistemas, com backen
 ## Estrutura do Repositório
 
 - [Guia de localizacao do projeto](docs/README_PROJETO.md)
+- [Modularizacao do projeto](docs/MODULARIZACAO.md)
 - [Arquitetura](docs/ARQUITETURA.md)
+- [Decisoes arquiteturais](docs/DECISOES_ARQUITETURA.md)
 - [UML e diagramas](docs/UML.md)
 - [Documentação detalhada](docs/guia-da-aplicacao-e-do-codigo.md)
 - `backend/`: API, modelos, middlewares, controllers, serviços, testes e OpenAPI.

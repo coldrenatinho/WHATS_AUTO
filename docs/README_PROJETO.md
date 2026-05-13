@@ -1,123 +1,131 @@
-# Guia de localizacao do projeto
+# Documentacao tecnica do WHATS_AUTO
 
-Este documento e o ponto de entrada para se orientar no WHATS_AUTO.
+Este e o ponto de entrada para entender, manter e evoluir o projeto.
 
-## Resumo
+O objetivo desta documentacao e responder rapidamente:
 
-O projeto e uma plataforma multi-tenant de atendimento WhatsApp.
+- o que o sistema faz;
+- como o codigo esta dividido;
+- onde cada responsabilidade deve ficar;
+- quais fluxos sao criticos;
+- como visualizar a arquitetura em UML/vetores;
+- como fazer deploy e troubleshooting sem depender de conhecimento informal.
 
-- Frontend: Vue 3, Vite, Pinia, Vue Router, Vuetify e Socket.IO client.
-- Backend: Node.js, Express, TypeScript, Sequelize, JWT e Socket.IO.
-- Banco principal: MariaDB.
-- WhatsApp: Evolution API, acessada pelo backend via `revolution.service.ts`.
-- Deploy simples: `docker-compose.simple.yml`.
+## Visao executiva
 
-## Onde olhar primeiro
+O WHATS_AUTO e uma plataforma multi-tenant de atendimento via WhatsApp. O sistema centraliza conversas, instancias WhatsApp, operadores, automacoes e mensagens em tempo real.
 
-| Necessidade | Arquivo ou pasta |
+Principais blocos:
+
+- **Frontend**: SPA Vue 3 para painel administrativo e fila do operador.
+- **Backend**: API Express/TypeScript com autenticacao, tickets, mensagens, instancias e automacoes.
+- **Realtime**: Socket.IO para atualizar conversas e mensagens sem recarregar a tela.
+- **Persistencia**: MariaDB via Sequelize.
+- **WhatsApp**: Evolution API como provedor de conexao e envio/recebimento.
+- **Automacoes**: Typebot e n8n como integracoes opcionais.
+- **Deploy**: Docker Compose simples e GitHub Actions manual via SSH.
+
+## Indice recomendado
+
+| Documento | Para que serve |
 |---|---|
-| Rotas HTTP da API | `backend/src/routes/index.ts` |
-| Entrada principal Express | `backend/src/app.ts` |
-| Inicializacao do servidor e Socket.IO | `backend/src/server.ts` |
-| Models e associacoes | `backend/src/models/index.ts` |
-| Controllers HTTP | `backend/src/controllers/` |
-| Regras de negocio antigas/gerais | `backend/src/services/` |
-| Fluxo de mensagens inbound/outbound | `backend/src/application/chatbot/` |
-| Persistencia do chatbot | `backend/src/infrastructure/persistence/sequelize/` |
+| [Modularizacao](./MODULARIZACAO.md) | Explica como o projeto esta dividido, por que foi dividido assim e onde colocar codigo novo |
+| [Arquitetura](./ARQUITETURA.md) | Descreve camadas, dependencias, frontend, backend, banco, realtime e deploy |
+| [Decisoes arquiteturais](./DECISOES_ARQUITETURA.md) | Registra as principais decisoes tecnicas, motivos e impactos |
+| [UML e diagramas](./UML.md) | Diagramas Mermaid do sistema, fluxos e entidades |
+| [Diagramas vetoriais SVG](./vetores/README.md) | Versoes vetoriais para Figma, Illustrator, Inkscape e diagrams.net |
+| [Deploy simples](../DEPLOY_SIMPLES.md) | Como subir a stack reduzida com Docker Compose |
+| [GitHub Actions](../.github/WORKFLOWS.md) | Como funcionam CI e deploy manual |
+| [Migracoes de banco](./migracao-banco-dados.md) | Como criar, executar e reverter migracoes |
+
+## Guia rapido: onde procurar
+
+| Necessidade | Local |
+|---|---|
+| Rotas HTTP | `backend/src/routes/index.ts` |
+| Configuracao do Express | `backend/src/app.ts` |
+| Inicializacao HTTP + Socket.IO | `backend/src/server.ts` |
+| Models e relacionamentos | `backend/src/models/` e `backend/src/models/index.ts` |
+| Controllers | `backend/src/controllers/` |
+| Services gerais | `backend/src/services/` |
+| Dominio de mensagens/conversas | `backend/src/application/chatbot/` |
+| Repositorios Sequelize do chatbot | `backend/src/infrastructure/persistence/sequelize/` |
 | Eventos realtime | `backend/src/realtime/` |
 | Rotas do frontend | `frontend/src/router/index.ts` |
-| Layout principal | `frontend/src/App.vue` |
-| Tela administrativa de conversas | `frontend/src/views/Tickets.vue` |
-| Fila do operador | `frontend/src/views/OperatorQueue.vue` |
-| Cliente HTTP | `frontend/src/services/api.ts` |
-| Cliente Socket.IO | `frontend/src/services/socket.ts` |
-| Store de autenticacao | `frontend/src/stores/auth.ts` |
-| Deploy simples | `DEPLOY_SIMPLES.md` |
-| GitHub Actions | `.github/WORKFLOWS.md` |
+| Shell/layout do app | `frontend/src/App.vue` |
+| Tela admin de conversas | `frontend/src/views/Tickets.vue` |
+| Fila de atendimento | `frontend/src/views/OperatorQueue.vue` |
+| Cliente HTTP frontend | `frontend/src/services/api.ts` |
+| Cliente Socket.IO frontend | `frontend/src/services/socket.ts` |
+| Autenticacao frontend | `frontend/src/stores/auth.ts` |
+| Compose simples | `docker-compose.simple.yml` |
+| Pipeline CI | `.github/workflows/ci.yml` |
+| Pipeline de deploy | `.github/workflows/cd.yml` |
 
-## Mapas e UML
+## Organizacao macro do repositorio
 
-- [Arquitetura](./ARQUITETURA.md)
-- [UML e diagramas](./UML.md)
-- [Diagramas vetoriais SVG](./vetores/README.md)
+```text
+.
+├── backend/                 API Express, dominio, persistencia e testes
+├── frontend/                SPA Vue 3
+├── docs/                    Documentacao tecnica, arquitetura e operacao
+├── infrastructure/          SQL e scripts auxiliares de banco
+├── design-tokens/           Tokens e referencias visuais
+├── .github/                 Workflows, scripts e docs de CI/CD
+├── docker-compose.yml       Stack completa/legada com Traefik e servicos extras
+├── docker-compose.simple.yml Stack simplificada recomendada
+└── DEPLOY_SIMPLES.md        Guia direto de deploy
+```
 
-## Modulos principais
+## Fluxos criticos
 
-### Backend
+### Recebimento de mensagem
 
-`backend/src/app.ts` configura middlewares, CORS, JSON parser, Swagger e monta as rotas.
+1. Evolution API recebe mensagem do WhatsApp.
+2. Evolution chama `POST /api/webhooks/evolution`.
+3. `WebhookController` valida e delega o payload.
+4. `InboundMessageParser` normaliza os campos recebidos.
+5. `ChatbotOrchestratorService` localiza a instancia e o ticket.
+6. A mensagem inbound e salva em `messages`.
+7. Eventos realtime sao emitidos para a empresa/ticket.
+8. Frontend atualiza fila e conversa.
 
-`backend/src/server.ts` cria o servidor HTTP, inicializa Socket.IO e roda o bootstrap.
+### Resposta do operador
 
-`backend/src/routes/index.ts` centraliza as rotas. As rotas publicas ficam antes de `authMiddleware`; as rotas protegidas ficam depois.
+1. Operador envia texto pelo frontend.
+2. Frontend chama `POST /api/messages/tickets/:ticketId/text`.
+3. `MessagesController` delega para `ConversationMessageApplication`.
+4. Backend envia a mensagem pela Evolution API.
+5. Mensagem outbound e persistida.
+6. Socket.IO notifica as telas conectadas.
 
-`backend/src/application/chatbot/` concentra o fluxo mais importante do dominio de atendimento:
+### Deploy
 
-- parse do webhook de entrada
-- criacao ou reaproveitamento de ticket
-- persistencia de mensagem
-- despacho para Typebot ou n8n
-- envio de mensagem do operador para o WhatsApp
+1. CI valida build backend/frontend e compose simples.
+2. Deploy e acionado manualmente no GitHub Actions.
+3. Workflow acessa o servidor via SSH.
+4. Servidor executa `git pull` e `docker compose ... up -d --build`.
+5. Smoke test valida `/health` e `/api/health`.
 
-`backend/src/realtime/` cuida de autenticacao Socket.IO, salas por empresa/ticket e emissao de eventos.
+## Principios de manutencao
 
-### Frontend
+- **Controller nao deve carregar regra de negocio pesada.** Controller deve validar entrada, chamar aplicacao/service e retornar HTTP.
+- **Dominio novo deve ir para `application/`.** A pasta `services/` ainda existe para regras gerais e legado, mas fluxos novos mais importantes devem nascer com contratos claros.
+- **Integracao externa deve ser isolada.** Evolution, n8n, Typebot e qualquer outro provedor devem ficar atras de services, providers ou strategies.
+- **Persistencia deve ficar substituivel.** O chatbot ja usa portas e implementacoes Sequelize; esse padrao deve ser reaproveitado quando o dominio justificar.
+- **Frontend deve falar com backend por services.** Views nao devem espalhar detalhes de URL ou socket sem necessidade.
+- **Realtime deve ser evento de dominio.** Tela nao deve depender de detalhes internos do banco; deve reagir a `server:ticket.*` e `server:message.created`.
 
-`frontend/src/router/index.ts` define as telas e regras de acesso por papel.
+## Glossario
 
-`frontend/src/stores/auth.ts` controla login, usuario atual, empresa atual e conexao Socket.IO.
-
-`frontend/src/services/api.ts` injeta o token JWT nas chamadas HTTP.
-
-`frontend/src/services/socket.ts` conecta no Socket.IO e expoe assinaturas para eventos realtime.
-
-`frontend/src/views/Tickets.vue` e a tela administrativa de conversas.
-
-`frontend/src/views/OperatorQueue.vue` e a tela operacional dos agentes.
-
-## Fluxos de trabalho frequentes
-
-### Receber mensagem do usuario
-
-1. Evolution envia webhook para `POST /api/webhooks/evolution`.
-2. `WebhookController` chama `InboundMessageParser`.
-3. `ChatbotOrchestratorService` localiza a instancia.
-4. O backend cria ou reutiliza um ticket aberto.
-5. A mensagem inbound e salva na tabela `messages`.
-6. Eventos `server:ticket.*` e `server:message.created` sao emitidos.
-7. Frontend atualiza a lista e a conversa aberta.
-
-### Operador responder conversa
-
-1. Frontend chama `POST /api/messages/tickets/:ticketId/text` com `{ text }`.
-2. `MessagesController` chama `ConversationMessageApplication`.
-3. A aplicacao envia texto pela Evolution API.
-4. A resposta outbound e salva em `messages`.
-5. Backend emite `server:message.created`.
-6. Frontend adiciona a mensagem na conversa.
-
-### Adicionar rota nova
-
-1. Crie ou ajuste um controller em `backend/src/controllers/`.
-2. Se houver regra de negocio, coloque em `backend/src/services/` ou em `backend/src/application/` se for dominio novo.
-3. Registre a rota em `backend/src/routes/index.ts`.
-4. Adicione teste em `backend/src/__tests__/`.
-5. Consuma no frontend via `frontend/src/services/api.ts`.
-
-### Adicionar tela nova
-
-1. Crie a view em `frontend/src/views/`.
-2. Registre em `frontend/src/router/index.ts`.
-3. Ajuste menu em `frontend/src/App.vue`.
-4. Use `api.ts` para HTTP e `socket.ts` para realtime.
-
-## Glossario rapido
-
-- Company: empresa/tenant.
-- Instance: instancia WhatsApp/Evolution vinculada a uma empresa.
-- Ticket: conversa/atendimento de um contato.
-- Message: mensagem inbound ou outbound de um ticket.
-- Flow: automacao configurada para despacho.
-- FlowWorkspace: estado visual/editorial do fluxo.
-- MessageTemplate: mensagens prontas para operadores.
-- BotConfig: configuracoes de comportamento do bot.
+| Termo | Significado |
+|---|---|
+| Company | Empresa/tenant dona dos dados |
+| User | Usuario do sistema, como admin, manager, agent ou viewer |
+| Instance | Instancia WhatsApp/Evolution vinculada a uma empresa |
+| Ticket | Conversa ou atendimento com um contato |
+| Message | Mensagem inbound ou outbound associada a um ticket |
+| Flow | Automacao ativa ou configurada |
+| FlowWorkspace | Estado visual/editorial do fluxo |
+| MessageTemplate | Modelo de mensagem usado no atendimento |
+| BotConfig | Configuracoes de comportamento do bot |
